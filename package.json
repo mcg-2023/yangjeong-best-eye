@@ -1,0 +1,17 @@
+{
+  "name": "yangjeong-best-website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/dev.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "node scripts/check.mjs",
+    "seed:test": "node scripts/seed-test-posts.mjs"
+  },
+  "devDependencies": {
+    "vite": "8.3.4"
+  }
+}

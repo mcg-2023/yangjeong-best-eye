@@ -1,0 +1,3 @@
+import {readFile,readdir} from 'node:fs/promises';
+import {resolve} from 'node:path';
+export async function getAssets(){const assets={};const types={svg:'image/svg+xml',png:'image/png',webp:'image/webp',woff2:'font/woff2',txt:'text/plain; charset=utf-8'};for(const file of await readdir(resolve('public/assets'))){const ext=file.split('.').pop();if(types[ext]&&!['main_sd3_n.webp','doctor.webp'].includes(file))assets['/assets/'+file]={data:(await readFile(resolve('public/assets',file))).toString('base64'),type:types[ext]};}for(const [url,file,type] of [['/style.css','src/style.css','text/css; charset=utf-8'],['/client.js','src/client.js','text/javascript; charset=utf-8']])assets[url]={data:(await readFile(file)).toString('base64'),type};return assets;}
