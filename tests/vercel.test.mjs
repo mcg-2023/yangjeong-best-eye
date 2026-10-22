@@ -1,0 +1,62 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createVercelHandler} from '../src/vercel-runtime.js';
+import {createSupabaseDatabase} from '../src/supabase-database.js';
+
+const origin='https://clinic.vercel.app';
+const credentials='Basic '+Buffer.from('editor:example-password-for-tests').toString('base64');
+test('Vercel requires its own admin authentication, preserves drafts, and writes through Supabase',async()=>{
+  const rows=new Map(),calls=[];
+  const fetchImpl=async(input,options)=>{
+    const url=new URL(input);calls.push({url,options});
+    assert.equal(options.headers.apikey,'sb_secret_test_only');
+    if(options.method==='POST'){
+      const row=JSON.parse(options.body);rows.set(row.id,row);
+      assert.equal(options.headers.Prefer,'resolution=merge-duplicates,return=minimal');
+      return new Response(null,{status:204});
+    }
+    const id=url.searchParams.get('id')?.slice(3);
+    return Response.json(id?(rows.has(id)?[rows.get(id)]:[]):[...rows.values()]);
+  };
+  const env={SUPABASE_URL:'https://test.supabase.co',SUPABASE_SECRET_KEY:'sb_secret_test_only',ADMIN_USERNAME:'editor',ADMIN_PASSWORD:'example-password-for-tests',LOCAL_PREVIEW:true};
+  const handler=createVercelHandler({environment:()=>env,fetchImpl});
+  const get=(path,headers={})=>handler(new Request(origin+path,{headers}));
+  assert.equal((await get('/admin/',{'oai-authenticated-user-id':'spoofed'})).status,401);
+  assert.equal((await get('/admin/',{authorization:credentials})).status,200);
+  const fields={title:'배포 연결 확인',body:'## 안내\n저장 상태를 확인합니다.',category:'notice',author:'운영자',excerpt:'배포 확인용',status:'draft'};
+  const save=(extra={},site=origin)=>handler(new Request(origin+'/api/posts',{method:'POST',headers:{authorization:credentials,origin:site,Accept:'application/json'},body:new URLSearchParams({...fields,...extra})}));
+  assert.equal((await save({},'https://other.example')).status,403);
+  let response=await save();assert.equal(response.status,200);
+  const {id}=await response.json();
+  assert.equal((await get('/health/'+id+'/')).status,404);
+  assert.doesNotMatch(await (await get('/health/')).text(),/배포 연결 확인/);
+  response=await save({id,status:'published'});assert.equal(response.status,200);
+  assert.equal(rows.size,1);
+  const reopened=createVercelHandler({environment:()=>env,fetchImpl});
+  response=await reopened(new Request(origin+'/health/'+id+'/'));
+  assert.equal(response.status,200);
+  const html=await response.text();assert.match(html,/배포 연결 확인/);assert.doesNotMatch(html,/sb_secret_test_only|example-password-for-tests/);
+  assert.match(html,/noindex,follow/);
+  assert.ok(calls.every(call=>call.url.origin==='https://test.supabase.co'));
+});
+
+test('missing production credentials fail closed and do not enable ephemeral database writes',async()=>{
+  let calls=0;
+  const handler=createVercelHandler({environment:()=>({}),fetchImpl:async()=>{calls++;throw new Error('Unexpected request');}});
+  assert.equal((await handler(new Request(origin+'/'))).status,503);
+  assert.equal((await handler(new Request(origin+'/admin/'))).status,503);
+  assert.equal(calls,0);
+  assert.throws(()=>createSupabaseDatabase({url:'https://test.supabase.co',secretKey:'sb_publishable_test'}),/server secret/);
+});
+
+test('Supabase pagination reads beyond one API page and transport failures do not disclose secrets',async()=>{
+  let page=0;
+  const database=createSupabaseDatabase({url:'https://test.supabase.co',secretKey:'sb_secret_test_only',fetchImpl:async(input)=>{
+    const url=new URL(input);assert.equal(Number(url.searchParams.get('offset')),page*100);
+    const count=page++===0?100:1;
+    return Response.json(Array.from({length:count},(_,i)=>({data:{id:String((page-1)*100+i)}})));
+  }});
+  assert.equal((await database.posts.list()).length,101);
+  const failing=createSupabaseDatabase({url:'https://test.supabase.co',secretKey:'sb_secret_test_only',fetchImpl:async()=>new Response('private backend message',{status:500})});
+  await assert.rejects(()=>failing.posts.list(),error=>error.message==='Supabase posts request failed: 500');
+});

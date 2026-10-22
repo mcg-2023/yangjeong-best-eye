@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "node --watch scripts/dev.mjs",
     "build": "node scripts/build.mjs",
+    "build:vercel": "node scripts/build-vercel.mjs",
     "preview": "node scripts/dev.mjs",
     "test": "node --test tests/*.test.mjs",
     "check": "node scripts/check.mjs",
     "seed:test": "node scripts/seed-test-posts.mjs"
   },
+  "engines": {"node": "24.x"},
   "devDependencies": {
     "vite": "8.3.4"
   }

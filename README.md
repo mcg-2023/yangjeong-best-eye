@@ -28,6 +28,8 @@ npm run dev
 
 ## 저장과 백업
 
+Vercel용 실행 설정을 추가했습니다. Vercel은 `npm run build:vercel`, Node.js 24.x와 `api/index.js`를 사용하고 게시글은 Supabase에 저장합니다. 연결 순서·환경변수·관리자 인증은 `docs/vercel-deployment.md`를 참고하세요. 기존 `npm run build`는 이전 Worker 출력용으로 유지합니다. 계정 연결과 저장소 환경변수는 별도로 실제 설정해야 합니다.
+
 로컬 글은 `.data/journal.sqlite`에 실제 저장되며 재시작해도 유지됩니다. 로컬 DB는 Git과 배포 파일에서 제외합니다. 백업할 때 서버를 종료하고 `.data/journal.sqlite`를 복사하세요. 로컬 글이 배포 DB로 자동 업로드되지는 않습니다.
 
 배포용 결과는 Cloudflare Worker ESM + Sites D1입니다. `.openai/hosting.json`에 `DB` 바인딩과 SQL 마이그레이션을 설정했습니다. Sites는 현재 소유자 전용이며 외부 저장·게시는 실행하지 못한 상태입니다. 외부 저장 승인 후 배포 및 D1 연동 검증이 별도로 필요합니다. 공개로 전환하려면 관리자 권한 모델을 먼저 추가해야 합니다. 현재 Worker의 관리 권한은 소유자 전용 Sites 접근 경계와 플랫폼 인증 헤더를 전제로 합니다.
