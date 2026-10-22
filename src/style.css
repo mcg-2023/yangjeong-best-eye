@@ -739,7 +739,7 @@ body{color:var(--ink);background:#fff;word-break:keep-all;font-size:16px;letter-
 .clinic-space-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
 .clinic-space-card { min-width: 0; margin: 0; }
 .clinic-space-card > img { width: 100%; height: auto; aspect-ratio: 3 / 4; object-fit: cover; background: #eee; }
-.clinic-space-card figcaption { display: flex; align-items: baseline; gap: 12px; padding-top: 18px; }
+.clinic-space-card figcaption { display: flex; align-items: center; gap: 12px; padding-top: 18px; }
 .clinic-space-card figcaption > span { color: var(--brand); font-size: 12px; font-variant-numeric: tabular-nums; }
 .clinic-space-card h3 { font-size: 18px; font-weight: 600; }
 .clinic-photo-note { color: var(--muted); font-size: 16px; margin-top: 25px; line-height: 1.8; }
