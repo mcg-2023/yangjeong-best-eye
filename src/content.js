@@ -51,7 +51,6 @@ export function validatePost(post, publishing=false) {
       if(!post.reviewer?.trim()||!post.reviewedAt||!post.reviewApproved)errors.push('의료 검수자·검수일과 검수 완료 확인이 필요합니다.');
       const reviewDate=new Date(post.reviewedAt+'T00:00:00Z');
       if(!/^\d{4}-\d{2}-\d{2}$/.test(post.reviewedAt??'')||Number.isNaN(reviewDate.getTime())||reviewDate.toISOString().slice(0,10)!==post.reviewedAt||post.reviewedAt>new Date().toISOString().slice(0,10))errors.push('유효한 검수일을 입력해주세요.');
-      if(!(post.sources??[]).some(s=>safeLink(s.url)&&s.title?.trim()))errors.push('실제로 참고한 자료의 제목과 URL을 입력해주세요.');
     }
   }
   return errors;

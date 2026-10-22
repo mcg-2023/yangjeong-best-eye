@@ -23,7 +23,7 @@ test('drafts are private; publication, edit, search, feed and withdrawal share o
   assert.match(await (await get('/health/'+id+'/')).text(),/수정된 안내/);
   r=await save({...notice,id,status:'draft'});assert.equal(r.status,200);assert.equal((await get('/health/'+id+'/')).status,404);assert.doesNotMatch(await (await get('/feed.xml')).text(),new RegExp(id));
 }finally{db.close();}});
-test('unreviewed medical content cannot be published; explicit review and sources are required on every save',async()=>{const {db,get,save}=setup();try{
+test('unreviewed medical content cannot be published; explicit review is required on every save',async()=>{const {db,get,save}=setup();try{
  const p={...notice,category:'dry-eye',status:'published',answer:'의료정보 확인용 초안'};
  let r=await save(p);assert.equal(r.status,422);assert.equal(db.prepare('SELECT count(*) AS n FROM posts').get().n,0);
  r=await save({...p,reviewer:'검수 확인용',reviewedAt:'2026-01-01',reviewApproved:'yes',sourcesText:'공식 참고자료 | https://www.nei.nih.gov/'});assert.equal(r.status,200);const {id}=await r.json();
@@ -38,6 +38,19 @@ test('authentication, CSRF, input escaping and status codes are enforced',async(
  assert.equal((await save({...notice,title:'<script>alert(1)</script>',body:'<img src=x onerror=alert(1)>',status:'published'})).status,200);
  const text=await (await get('/health/')).text();assert.doesNotMatch(text,/<script>alert\(1\)/);assert.match(text,/&lt;script&gt;/);
  assert.doesNotMatch(markdown('<script>alert(1)</script>'),/<script>/);
+}finally{db.close();}});
+test('removed FAQ, reference and tag fields do not block reviewed publication or erase existing metadata',async()=>{const {db,get,save}=setup();try{
+  const html=await (await get('/admin/new/')).text();
+  assert.doesNotMatch(html,/질문과 참고자료|name="(?:faqText|sourcesText|tags)"/);
+  let response=await save({...notice,category:'dry-eye',status:'published',answer:'검증용 핵심 답변',reviewer:'검수 확인용',reviewedAt:'2026-01-01',reviewApproved:'yes'});
+  assert.equal(response.status,200,'reviewed medical posts can publish without removed source inputs');
+  response=await save({...notice,faqText:'기존 질문 | 기존 답변',sourcesText:'기존 출처 | https://www.nei.nih.gov/',tags:'기존 태그'});
+  const {id}=await response.json();
+  response=await save({...notice,id,title:'내용만 수정한 글'});assert.equal(response.status,200);
+  const stored=JSON.parse(db.prepare('SELECT data FROM posts WHERE id=?').get(id).data);
+  assert.deepEqual(stored.faq,[{question:'기존 질문',answer:'기존 답변'}]);
+  assert.deepEqual(stored.sources,[{title:'기존 출처',url:'https://www.nei.nih.gov/'}]);
+  assert.deepEqual(stored.tags,['기존 태그']);
 }finally{db.close();}});
 test('canonical metadata, JSON-LD and crawlable pages are rendered without client JavaScript',async()=>{const {db,get}=setup();try{
  for(const path of ['/','/health/','/clinic/','/location/']){
