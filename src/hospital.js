@@ -7,6 +7,9 @@ export const hospital = {
   closed: '일요일·공휴일 휴진',
   source: 'http://besteye.willstay.co.kr/', verifiedAt: '2026-10-21',
   map: 'https://m.place.naver.com/hospital/1384730840/home?entry=pll',
+  googleMap: 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent('양정베스트안과 부산광역시 부산진구 중앙대로 915'),
+  // Official Google Maps "Embed a map" URL for the matching clinic listing.
+  googleMapEmbed: 'https://www.google.com/maps/embed?pb=!1m5!3m3!1m2!1s0x3568eb4cdab3c88f%3A0x31520a5b08956fde!2z7JaR7KCV67Kg7Iqk7Yq47JWI6rO8!5e0!3m2!1sko!2skr!4v1792647996140!5m2!1sko!2skr',
   reception: '처음 방문하시면 4층에서 접수해주세요.',
   floors: [
     {floor:'4F',name:'접수 · 외래 · 검진',description:'접수 후 진료와 검사 안내를 받으실 수 있습니다.'},
