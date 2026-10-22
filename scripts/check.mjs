@@ -8,7 +8,7 @@ const db=new DatabaseSync(':memory:');db.exec(await readFile('drizzle/0000_posts
 const env={DB:adapt(db),LOCAL_PREVIEW:true},origin='https://clinic.test';
 const get=(path,options=env)=>app.fetch(new Request(origin+path),options);
 try {
-  const visited=new Set(),queue=['/'],titles=new Set();
+  const visited=new Set(),queue=['/','/admin/'],titles=new Set();
   while(queue.length){
     const path=queue.shift();if(visited.has(path))continue;visited.add(path);
     const response=await get(path);assert.equal(response.status,200,path);

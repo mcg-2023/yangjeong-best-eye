@@ -26,11 +26,20 @@ export function createApp(assets={}) {
       const previewHost=env.LOCAL_PREVIEW===true||env.SITE_INDEXING==='off'||origin!==url.origin;
       if(request.method==='POST'){
         if(request.headers.get('origin')!==url.origin||request.headers.get('sec-fetch-site')==='cross-site')return json({errors:['같은 사이트의 글쓰기 화면에서 다시 시도해주세요.']},403);
-        if(!['/api/posts','/api/posts/status'].includes(path))return json({errors:['지원하지 않는 요청입니다.']},404);
+        if(!['/api/posts','/api/posts/status','/api/posts/delete'].includes(path))return json({errors:['지원하지 않는 요청입니다.']},404);
         if(Number(request.headers.get('content-length')??0)>3500000)return json({errors:['요청 크기가 너무 큽니다.']},413);
         const raw=await request.text();if(raw.length>3500000)return json({errors:['요청 크기가 너무 큽니다.']},413);
         const data=new URLSearchParams(raw);
         if(env.CSRF_TOKEN&&data.get('csrf')!==env.CSRF_TOKEN)return json({errors:['화면을 새로고침한 후 다시 시도해주세요.']},403);
+        if(path==='/api/posts/delete'){
+          const id=data.get('id')??'';
+          if(!/^[\w-]+$/.test(id))return json({errors:['글을 찾을 수 없습니다.']},404);
+          if(data.get('confirmDelete')!=='yes')return json({errors:['삭제 확인 화면에서 다시 시도해주세요.']},400);
+          const old=await repo.get(id);
+          if(!old)return json({errors:['글을 찾을 수 없습니다.']},404);
+          await repo.delete(id);
+          return request.headers.get('accept')?.includes('application/json')?json({message:'글을 삭제했습니다.',url:'/admin/posts/?deleted=1'}):redirect('/admin/posts/?deleted=1');
+        }
         if(path==='/api/posts/status'){
           const old=await repo.get(data.get('id')??''),status=data.get('status');
           if(!old)return json({errors:['글을 찾을 수 없습니다.']},404);
@@ -56,6 +65,7 @@ export function createApp(assets={}) {
         return redirect('/admin/edit/'+p.id+'/');
       }
       if(!['GET','HEAD'].includes(request.method))return new Response(null,{status:405,headers:{Allow:'GET, HEAD, POST'}});
+      if(path==='/api/posts/delete')return new Response(null,{status:405,headers:{Allow:'POST'}});
       // Consolidate aliases and slash variants with permanent redirects; removed pages remain 404.
       if(path==='/contact'||path==='/contact/')return new Response(null,{status:301,headers:{Location:'/location/'+url.search}});
       if(/^\/(?:health|clinic|location|privacy|editorial-policy|admin|admin\/(?:new|posts|settings)|health\/category\/[\w-]+|health\/[\w-]+|admin\/(?:edit|preview)\/[\w-]+)$/.test(path))return new Response(null,{status:308,headers:{Location:path+'/'+url.search}});
@@ -89,6 +99,7 @@ export function createApp(assets={}) {
       if(path==='/admin/posts/')return desk('게시글 관리',admin.postsPage(posts,url.searchParams,{csrf:env.CSRF_TOKEN??''}));
       if(path==='/admin/settings/')return desk('운영 안내',admin.settingsPage({username:env.ADMIN_USERNAME,origin,indexing:!previewHost,local:env.LOCAL_PREVIEW===true}));
       if(path==='/admin/new/')return desk('새 글 작성',admin.editorPage({},env.CSRF_TOKEN??''));
+      const deletion=path.match(/^\/admin\/delete\/([\w-]+)\/$/);if(deletion){const p=await repo.get(deletion[1]);return p?desk('게시글 삭제',admin.deletePage(p,env.CSRF_TOKEN??'')):notFound();}
       const edit=path.match(/^\/admin\/edit\/([\w-]+)\/$/);if(edit){const p=await repo.get(edit[1]);return p?desk('글 수정',admin.editorPage(p,env.CSRF_TOKEN??'')):notFound();}
       const preview=path.match(/^\/admin\/preview\/([\w-]+)\/$/);if(preview){const p=await repo.get(preview[1]);return p?desk('미리보기',`<div class="desk-preview"><a href="/admin/edit/${p.id}/" class="btn">편집 화면으로 ${v.icon('arrow',16)}</a>${v.article(p,posts,true)}</div>`):notFound();}
       if(path==='/health/'){const options=collectionOptions();if(!options.valid)return notFound();return frame('건강정보'+(options.page>1?' · '+options.page+'페이지':''),'눈 건강 정보와 병원소식을 주제별로 살펴보세요.',`<div class="wrap">${v.breadcrumb([{name:'건강정보'}])}${v.pageIntro('HEALTH JOURNAL','눈 건강을 읽다.','눈에 관한 질문과 일상의 건강을 잇는 이야기. 필요한 정보를 주제별로 찾아보세요.')}</div>${v.journal(posts,{query:url.searchParams.get('q')??'',page:Number(url.searchParams.get('page'))||1})}`,options);}

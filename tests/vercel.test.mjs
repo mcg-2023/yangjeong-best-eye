@@ -44,6 +44,11 @@ test('Vercel requires its own admin authentication, preserves drafts, and writes
   const fetchImpl=async(input,options)=>{
     const url=new URL(input);calls.push({url,options});
     assert.equal(options.headers.apikey,'sb_secret_test_only');
+    if(options.method==='DELETE'){
+      assert.equal(url.searchParams.get('id'),'eq.'+[...rows.keys()][0]);
+      assert.equal(options.headers.Prefer,'return=minimal');
+      rows.delete(url.searchParams.get('id').slice(3));return new Response(null,{status:204});
+    }
     if(options.method==='POST'){
       const row=JSON.parse(options.body);rows.set(row.id,row);
       assert.equal(options.headers.Prefer,'resolution=merge-duplicates,return=minimal');
@@ -72,6 +77,9 @@ test('Vercel requires its own admin authentication, preserves drafts, and writes
   assert.equal(response.status,200);
   const html=await response.text();assert.match(html,/배포 연결 확인/);assert.doesNotMatch(html,/sb_secret_test_only|example-password-for-tests/);
   assert.match(html,/noindex,follow/);
+  const deleted=await handler(new Request(origin+'/api/posts/delete',{method:'POST',headers:{cookie,origin,Accept:'application/json'},body:new URLSearchParams({id,csrf,confirmDelete:'yes'})}));
+  assert.equal(deleted.status,200);assert.equal(rows.size,0);
+  assert.equal((await get('/health/'+id+'/')).status,404);
   assert.ok(calls.every(call=>call.url.origin==='https://test.supabase.co'));
 });
 

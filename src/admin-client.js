@@ -18,3 +18,16 @@ document.querySelectorAll('[data-status-form]').forEach(form=>form.addEventListe
     location.reload();
   }catch(error){const feedback=document.querySelector('.desk-action-feedback');feedback.textContent=error.message||'연결 상태를 확인하고 다시 시도해주세요.';feedback.hidden=false;feedback.scrollIntoView({block:'center'});button.disabled=false;}
 }));
+
+document.querySelector('[data-delete-form]')?.addEventListener('submit',async event=>{
+  event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[type="submit"]'),feedback=form.querySelector('.desk-action-feedback');
+  if(button.disabled||!form.reportValidity())return;
+  button.disabled=true;button.textContent='삭제 중…';feedback.hidden=true;
+  try{
+    const response=await fetch(form.action,{method:'POST',body:new URLSearchParams(new FormData(form)),headers:{Accept:'application/json'}});
+    if(response.status===401){location.href='/admin/login/?next='+encodeURIComponent(location.pathname);return;}
+    const result=await response.json();
+    if(!response.ok)throw new Error(result.errors?.join(' ')||'삭제하지 못했습니다. 다시 시도해주세요.');
+    location.href=result.url;
+  }catch(error){feedback.textContent=error.message||'연결 상태를 확인하고 다시 시도해주세요.';feedback.hidden=false;feedback.focus();button.disabled=false;button.textContent='게시글 삭제';}
+});

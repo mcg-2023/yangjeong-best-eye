@@ -71,6 +71,15 @@
 .admin-body .status-medical_review{background:#fbf3e3;color:#b28a3d}
 .admin-body .status-archived{background:#eef0f5;color:#9a9eab}
 .desk-row-actions{display:flex;align-items:center;gap:13px;white-space:nowrap;color:#7282a0;font-size:16px}
+.desk-content .desk-danger{color:#ad3a3a!important}
+.desk-delete-card{max-width:760px;padding:32px}
+.desk-delete-card h2{margin:18px 0;font-size:24px;overflow-wrap:anywhere}
+.desk-delete-card p{font-size:16px;line-height:1.9;color:#68788f}
+.desk-delete-card .checkbox-field{margin:26px 0}
+.desk-delete-actions{display:flex;flex-wrap:wrap;gap:12px}
+.desk-content .desk-delete-button{background:#ad3a3a;color:white;border-color:#ad3a3a}
+.desk-content .desk-delete-button:hover{background:#8e2d2d}
+.desk-delete-card .desk-action-feedback{margin-top:20px}
 .desk-row-actions a{display:inline-flex;align-items:center;min-height:36px}
 .desk-row-actions button{border:0;background:none;padding:8px 0;color:#8b96a8;font-size:16px}
 .desk-row-actions button:hover{color:var(--brand)}

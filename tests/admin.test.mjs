@@ -55,6 +55,8 @@ test('all protected mutations require a session and CSRF token; logout only acce
   assert.equal((await access(post('/api/posts',{}, {cookie:session.cookie}),env)).response.status,403);
   assert.equal((await access(post('/api/posts',{csrf:session.csrf},{cookie:session.cookie,origin:'https://attacker.example'}),env)).response.status,403);
   assert.equal((await access(post('/api/posts',{csrf:session.csrf},{cookie:session.cookie}),env)).context.ADMIN_AUTHENTICATED,true);
+  assert.equal((await access(post('/api/posts/delete',{id:'post',confirmDelete:'yes'}),env)).response.status,401);
+  assert.equal((await access(post('/api/posts/delete',{id:'post',confirmDelete:'yes'},{cookie:session.cookie}),env)).response.status,403);
   assert.equal((await access(get('/admin/logout/',{cookie:session.cookie}),env)).response.status,405);
   assert.equal((await access(post('/admin/logout/',{}, {cookie:session.cookie}),env)).response.status,403);
   const logout=await access(post('/admin/logout/',{csrf:session.csrf},{cookie:session.cookie}),env);
@@ -102,4 +104,35 @@ test('image validation checks file signatures instead of trusting MIME or extens
     const path='public/assets/'+file;
     const bytes=await readFile(path);assert.equal(validCover('data:image/'+(file.endsWith('png')?'png':'webp')+';base64,'+bytes.toString('base64')),true);
   }
+});
+
+test('confirmed deletion removes only the selected post and its media; public pages contain no admin controls',async()=>{
+  const db=new DatabaseSync(':memory:');db.exec(await readFile('drizzle/0000_posts.sql','utf8'));
+  const settings={DB:adapt(db),LOCAL_PREVIEW:true,CSRF_TOKEN:'delete-csrf'},app=createApp();
+  const page=path=>app.fetch(get(path),settings);
+  const remove=(fields={},headers={})=>app.fetch(post('/api/posts/delete',{id:'delete-fixture',confirmDelete:'yes',csrf:'delete-csrf',...fields},{Accept:'application/json',...headers}),settings);
+  try{
+    for(const path of ['/','/health/','/health/category/notice/','/clinic/','/location/'])assert.doesNotMatch(await (await page(path)).text(),/href="\/admin\//,path+' has no admin links, including empty collections');
+    const image='data:image/png;base64,'+(await readFile('public/assets/favicon.png')).toString('base64');
+    for(const id of ['delete-fixture','keep-fixture']){
+      const p={id,title:id,category:'notice',author:'운영자',body:'## 안내\n본문',status:'published',excerpt:'요약',updatedAt:'2026-10-22T00:00:00Z',publishedAt:'2026-10-22T00:00:00Z',cover:image,imageAlt:'병원 로고',inlineImages:[{id:'inline-fixture',data:image,alt:'병원 로고'}]};
+      db.prepare('INSERT INTO posts VALUES (?,?,?,?)').run(id,JSON.stringify(p),p.status,p.updatedAt);
+    }
+    assert.equal((await page('/api/posts/delete')).status,405);
+    assert.equal((await remove({csrf:''})).status,403);
+    assert.equal((await remove({confirmDelete:''})).status,400);
+    assert.equal((await remove({}, {origin:'https://attacker.example'})).status,403);
+    const html=await (await page('/admin/delete/delete-fixture/')).text();
+    assert.match(html,/delete-fixture/);assert.match(html,/복구할 수 없습니다/);assert.match(html,/name="confirmDelete" value="yes" required/);assert.match(html,/name="csrf" value="delete-csrf"/);
+    assert.match(await (await page('/admin/posts/')).text(),/href="\/admin\/delete\/delete-fixture\/"/);
+    assert.match(await (await page('/admin/edit/delete-fixture/')).text(),/href="\/admin\/delete\/delete-fixture\/"/);
+    for(const path of ['/','/health/','/health/delete-fixture/'])assert.doesNotMatch(await (await page(path)).text(),/href="\/admin\//,path+' has no admin links when populated');
+    for(const path of ['/health/delete-fixture/','/media/delete-fixture/cover','/media/delete-fixture/inline/inline-fixture'])assert.equal((await page(path)).status,200);
+    const result=await remove();assert.equal(result.status,200);assert.equal((await result.json()).url,'/admin/posts/?deleted=1');
+    assert.equal(db.prepare('SELECT id FROM posts WHERE id = ?').get('delete-fixture'),undefined);
+    for(const path of ['/health/delete-fixture/','/media/delete-fixture/cover','/media/delete-fixture/inline/inline-fixture','/admin/edit/delete-fixture/','/admin/delete/delete-fixture/'])assert.equal((await page(path)).status,404,path);
+    for(const path of ['/','/health/','/sitemap.xml','/feed.xml','/admin/posts/'])assert.doesNotMatch(await (await page(path)).text(),/delete-fixture/);
+    assert.equal((await page('/health/keep-fixture/')).status,200);
+    assert.equal((await remove()).status,404);
+  }finally{db.close();}
 });

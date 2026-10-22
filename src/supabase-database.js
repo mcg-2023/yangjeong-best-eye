@@ -25,6 +25,7 @@ export function createSupabaseDatabase({url,secretKey,fetchImpl=fetch}={}) {
       }
     },
     async get(id){const rows=await (await query({select:'data',id:'eq.'+id,limit:1})).json();return rows.length?post(rows[0]):null;},
+    async delete(id){await query({id:'eq.'+id},{method:'DELETE',headers:{Prefer:'return=minimal'}});},
     async save(p){
       await query({on_conflict:'id'},{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:p.id,data:p,status:p.status,updated_at:p.updatedAt})});
       return p;
