@@ -18,6 +18,8 @@ test('Vercel accepts pasted domains and recovers invalid SITE_URL without previe
     [{SITE_URL:'javascript:alert(1)',VERCEL_PROJECT_PRODUCTION_URL:'clinic.example'},'https://clinic.example'],
     [{VERCEL_PROJECT_PRODUCTION_URL:'clinic.example'},'https://clinic.example'],
     [{SITE_URL:'bad value',VERCEL_PROJECT_PRODUCTION_URL:'bad value'},'https://yangjeong-best-eye.vercel.app'],
+    [{SITE_URL:'https://yangjeong-best-kpohzvd4t-mcg24.vercel.app',VERCEL_PROJECT_PRODUCTION_URL:'yangjeong-best-eye.vercel.app'},'https://yangjeong-best-eye.vercel.app'],
+    [{SITE_URL:'yangjeong-best-eye-git-main-mcg24.vercel.app',VERCEL_PROJECT_PRODUCTION_URL:'yangjeong-best-kpohzvd4t-mcg24.vercel.app'},'https://yangjeong-best-eye.vercel.app'],
   ];
   for(const [config,expected] of cases){
     const handler=createVercelHandler({environment:()=>({...base,...config}),fetchImpl:async()=>Response.json([])});
@@ -33,7 +35,7 @@ test('Vercel accepts pasted domains and recovers invalid SITE_URL without previe
       }
     }
   }
-  assert.equal(warning.mock.callCount(),5,'invalid settings warn once per handler');
+  assert.equal(warning.mock.callCount(),7,'invalid or temporary settings warn once per handler');
   assert.doesNotMatch(JSON.stringify(warning.mock.calls),/private-user|private-password/);
 });
 

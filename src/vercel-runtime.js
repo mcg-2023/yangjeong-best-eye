@@ -10,7 +10,12 @@ function configuredOrigin(value){
   let cleaned=value.trim();
   if((cleaned.startsWith('"')&&cleaned.endsWith('"'))||(cleaned.startsWith("'")&&cleaned.endsWith("'")))cleaned=cleaned.slice(1,-1).trim();
   if(/^(?:[a-z\d](?:[a-z\d-]*[a-z\d])?\.)+[a-z\d-]+(?::\d+)?\/?$/i.test(cleaned))cleaned='https://'+cleaned;
-  try{return siteOrigin(cleaned);}catch{return null;}
+  try{
+    const origin=siteOrigin(cleaned);
+    // The owner's earlier deployment/branch URLs are temporary, even when valid URLs.
+    if(/^yangjeong-best(?:-eye)?-.+-mcg24\.vercel\.app$/i.test(new URL(origin).hostname))return null;
+    return origin;
+  }catch{return null;}
 }
 
 const hash=value=>createHash('sha256').update(value).digest();
@@ -35,7 +40,7 @@ export function createVercelHandler({environment=()=>process.env,fetchImpl=fetch
     if(!database)return denied('게시판 저장소 연결이 필요합니다.',503);
     const configured=configuredOrigin(env.SITE_URL);
     if(env.SITE_URL?.trim()&&!configured&&!warnedAboutOrigin){
-      console.warn('Invalid SITE_URL configuration; using the production origin fallback.');
+      console.warn('Invalid or temporary SITE_URL configuration; using the production origin fallback.');
       warnedAboutOrigin=true;
     }
     const origin=configured||configuredOrigin(env.VERCEL_PROJECT_PRODUCTION_URL)||productionOrigin;
