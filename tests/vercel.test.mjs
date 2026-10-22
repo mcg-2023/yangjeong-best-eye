@@ -5,6 +5,38 @@ import {createSupabaseDatabase} from '../src/supabase-database.js';
 
 const origin='https://clinic.vercel.app';
 const credentials='Basic '+Buffer.from('editor:example-password-for-tests').toString('base64');
+test('Vercel accepts pasted domains and recovers invalid SITE_URL without preview canonicals',async t=>{
+  const warning=t.mock.method(console,'warn',()=>{});
+  const base={SUPABASE_URL:'https://test.supabase.co',SUPABASE_SECRET_KEY:'sb_secret_test_only',SITE_INDEXING:'on'};
+  const cases=[
+    [{SITE_URL:'yangjeong-best-eye.vercel.app'},'https://yangjeong-best-eye.vercel.app'],
+    [{SITE_URL:'  "https://clinic.example/"  '},'https://clinic.example'],
+    [{SITE_URL:" 'clinic.example/' "},'https://clinic.example'],
+    [{SITE_URL:'not a URL',VERCEL_PROJECT_PRODUCTION_URL:'clinic.example'},'https://clinic.example'],
+    [{SITE_URL:'https://private-user:private-password@clinic.example/',VERCEL_PROJECT_PRODUCTION_URL:'clinic.example'},'https://clinic.example'],
+    [{SITE_URL:'https://clinic.example/path',VERCEL_PROJECT_PRODUCTION_URL:'clinic.example'},'https://clinic.example'],
+    [{SITE_URL:'javascript:alert(1)',VERCEL_PROJECT_PRODUCTION_URL:'clinic.example'},'https://clinic.example'],
+    [{VERCEL_PROJECT_PRODUCTION_URL:'clinic.example'},'https://clinic.example'],
+    [{SITE_URL:'bad value',VERCEL_PROJECT_PRODUCTION_URL:'bad value'},'https://yangjeong-best-eye.vercel.app'],
+  ];
+  for(const [config,expected] of cases){
+    const handler=createVercelHandler({environment:()=>({...base,...config}),fetchImpl:async()=>Response.json([])});
+    for(const path of ['/','/clinic/','/location/','/robots.txt','/sitemap.xml','/feed.xml']){
+      const response=await handler(new Request('https://private-preview.vercel.app'+path));
+      assert.equal(response.status,200,JSON.stringify({config,path}));
+      const body=await response.text();
+      assert.ok(body.includes(expected+'/'),path+' uses the stable production origin');
+      assert.doesNotMatch(body,/private-preview\.vercel\.app|private-user|private-password/);
+      if(path.endsWith('/')){
+        assert.ok(body.includes('<link rel="canonical" href="'+expected+path+'">'));
+        assert.equal(response.headers.get('x-robots-tag'),'noindex, follow');
+      }
+    }
+  }
+  assert.equal(warning.mock.callCount(),5,'invalid settings warn once per handler');
+  assert.doesNotMatch(JSON.stringify(warning.mock.calls),/private-user|private-password/);
+});
+
 test('Vercel requires its own admin authentication, preserves drafts, and writes through Supabase',async()=>{
   const rows=new Map(),calls=[];
   const fetchImpl=async(input,options)=>{
