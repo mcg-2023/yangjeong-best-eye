@@ -2,9 +2,9 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createVercelHandler} from '../src/vercel-runtime.js';
 import {createSupabaseDatabase} from '../src/supabase-database.js';
+import {login} from './admin-helper.mjs';
 
 const origin='https://clinic.vercel.app';
-const credentials='Basic '+Buffer.from('editor:example-password-for-tests').toString('base64');
 test('Vercel accepts pasted domains and recovers invalid SITE_URL without preview canonicals',async t=>{
   const warning=t.mock.method(console,'warn',()=>{});
   const base={SUPABASE_URL:'https://test.supabase.co',SUPABASE_SECRET_KEY:'sb_secret_test_only',SITE_INDEXING:'on'};
@@ -54,11 +54,12 @@ test('Vercel requires its own admin authentication, preserves drafts, and writes
   };
   const env={SUPABASE_URL:'https://test.supabase.co',SUPABASE_SECRET_KEY:'sb_secret_test_only',ADMIN_USERNAME:'editor',ADMIN_PASSWORD:'example-password-for-tests',LOCAL_PREVIEW:true};
   const handler=createVercelHandler({environment:()=>env,fetchImpl});
-  const get=(path,headers={})=>handler(new Request(origin+path,{headers}));
-  assert.equal((await get('/admin/',{'oai-authenticated-user-id':'spoofed'})).status,401);
-  assert.equal((await get('/admin/',{authorization:credentials})).status,200);
+  assert.equal((await handler(new Request(origin+'/admin/',{headers:{'oai-authenticated-user-id':'spoofed'}}))).status,303);
+  const {cookie,csrf}=await login(handler,origin);
+  const get=(path,headers={})=>handler(new Request(origin+path,{headers:{cookie,...headers}}));
+  assert.equal((await get('/admin/')).status,200);
   const fields={title:'배포 연결 확인',body:'## 안내\n저장 상태를 확인합니다.',category:'notice',author:'운영자',excerpt:'배포 확인용',status:'draft'};
-  const save=(extra={},site=origin)=>handler(new Request(origin+'/api/posts',{method:'POST',headers:{authorization:credentials,origin:site,Accept:'application/json'},body:new URLSearchParams({...fields,...extra})}));
+  const save=(extra={},site=origin)=>handler(new Request(origin+'/api/posts',{method:'POST',headers:{cookie,origin:site,Accept:'application/json'},body:new URLSearchParams({...fields,csrf,...extra})}));
   assert.equal((await save({},'https://other.example')).status,403);
   let response=await save();assert.equal(response.status,200);
   const {id}=await response.json();

@@ -16,6 +16,12 @@ try {
     const html=await response.text();
     assert.equal((html.match(/<h1[\s>]/g)??[]).length,1,path);
     const title=html.match(/<title>([^]*?)<\/title>/)?.[1];assert.ok(title,path+' title');assert.ok(!titles.has(title),path+' unique title');titles.add(title);
+    if(path.startsWith('/admin/')){
+      assert.match(html,/<meta name="robots" content="noindex,nofollow">/,path+' private admin');
+      assert.doesNotMatch(html,/data-quick-menu/);
+      for(const m of html.matchAll(/(?:href|src)="(\/(?!\/)[^"#?]*)/g)){const link=m[1];if(link&&!visited.has(link))queue.push(link);}
+      continue;
+    }
     assert.match(html,/<meta name="description" content="[^"]+">/,path);
     assert.ok(html.includes('<link rel="canonical" href="'+origin+path+'">'),path+' canonical');
     const graph=JSON.parse(html.match(/<script type="application\/ld\+json">([^]*?)<\/script>/)[1])['@graph'];

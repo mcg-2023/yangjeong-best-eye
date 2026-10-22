@@ -21,6 +21,17 @@ export const headings = body => Array.from(String(body??'').matchAll(/^#{2,3} (.
 export const isTestPost = post => post.id?.startsWith('test-journal-') === true;
 export const coverUrl = post => post.cover ? `/media/${encodeURIComponent(post.id)}/cover?v=${encodeURIComponent(post.updatedAt??post.publishedAt??'1')}` : '/assets/main_sd1.webp';
 export const latestPosts = posts => posts.filter(p=>p.status==='published').sort((a,b)=>(b.publishedAt??b.createdAt??'').localeCompare(a.publishedAt??a.createdAt??'')||a.id.localeCompare(b.id));
+export function validCover(value){
+  if(typeof value!=='string'||value.length>750000)return false;
+  const match=value.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/);if(!match)return false;
+  try{
+    const bytes=atob(match[2]);
+    if(bytes.length>500*1024)return false;
+    if(match[1]==='png')return bytes.startsWith('\x89PNG\r\n\x1a\n')&&bytes.length>=24&&bytes.slice(12,16)==='IHDR';
+    if(match[1]==='jpeg')return bytes.startsWith('\xff\xd8\xff')&&bytes.endsWith('\xff\xd9');
+    return bytes.length>=20&&bytes.slice(0,4)==='RIFF'&&bytes.slice(8,12)==='WEBP'&&['VP8 ','VP8L','VP8X'].includes(bytes.slice(12,16));
+  }catch{return false;}
+}
 export function validatePost(post, publishing=false) {
   const errors=[];
   if(!post.title?.trim())errors.push('제목을 입력해주세요.');
@@ -28,7 +39,7 @@ export function validatePost(post, publishing=false) {
   if(!['cataract','children','dry-eye','retina','glaucoma','notice'].includes(post.category))errors.push('주제를 선택해주세요.');
   if(!post.body?.trim())errors.push('본문을 입력해주세요.');
   if((post.body??'').length>80000)errors.push('본문은 80,000자 이하로 입력해주세요.');
-  if(post.cover && (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(post.cover)||post.cover.length>750000))errors.push('이미지는 500KB 이하의 PNG, JPG, WebP를 사용해주세요.');
+  if(post.cover&&!validCover(post.cover))errors.push('실제 이미지 파일인 500KB 이하의 PNG, JPG, WebP를 사용해주세요.');
   if(post.cover&&!post.imageAlt?.trim())errors.push('대표이미지 설명을 입력해주세요.');
   if(publishing){
     if(!post.author?.trim())errors.push('작성자를 입력해주세요.');

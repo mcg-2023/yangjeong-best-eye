@@ -31,7 +31,7 @@ Supabase 연결은 서버에서만 사용합니다. `posts` 테이블은 RLS를 
 | `SITE_INDEXING` | 검증 중 off. 공개 운영과 최종 주소 확인 후 on |
 | `GOOGLE_SITE_VERIFICATION` / `NAVER_SITE_VERIFICATION` | 검색 서비스 소유권 인증 값. 필요한 경우에만 사용 |
 
-비밀번호와 서버 키는 Vercel의 비공개 환경변수에만 입력합니다. 관리 페이지는 HTTPS Basic 인증을 요구하며 외부에서 보낸 기존 플랫폼 인증 헤더를 신뢰하지 않습니다. 미설정 상태에서 메모리나 임시 파일로 저장한 것처럼 응답하지 않고 503을 반환합니다.
+비밀번호와 서버 키는 Vercel의 비공개 환경변수에만 입력합니다. `/admin/`에 접속하면 전용 로그인 화면이 나타나며 기존 `ADMIN_USERNAME`·`ADMIN_PASSWORD`로 로그인합니다. HTTPS 전용 HttpOnly 세션 쿠키와 CSRF 토큰을 사용합니다. 외부에서 보낸 기존 플랫폼 인증 헤더는 신뢰하지 않습니다. 미설정 상태에서 메모리나 임시 파일로 저장한 것처럼 응답하지 않고 503을 반환합니다. 자세한 구조와 운영 범위는 [관리자 시스템](admin-system.md)을 참고하세요.
 
 `SITE_URL`의 앞뒤 공백·따옴표와 생략된 `https://`는 서버에서 보정합니다. 잘못된 주소 또는 이 프로젝트의 임시 배포·브랜치 주소는 `VERCEL_PROJECT_PRODUCTION_URL`, 그 값도 사용할 수 없으면 현재 공개 주소 `https://yangjeong-best-eye.vercel.app`로 대체합니다. 미리보기 주소를 대표 주소로 사용하지 않으며, 미리보기의 검색 제외 설정을 유지합니다. 커스텀 도메인을 연결하면 `SITE_URL`도 실제 대표 주소로 변경하세요. 환경변수 변경은 새 배포부터 적용됩니다.
 
