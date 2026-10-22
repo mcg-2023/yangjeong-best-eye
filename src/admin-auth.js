@@ -30,9 +30,9 @@ export function createAdminAccess({now=()=>Date.now(),audit=entry=>console.info(
   const attempts=new Map();
   return async(request,env)=>{
     const url=new URL(request.url),path=url.pathname;
-    if(!/^\/admin(?:\/|$)/.test(path)&&!path.startsWith('/api/'))return {context:{}};
     const stamp=Math.floor(now()/1000),jar=cookies(request),configured=Boolean(env.ADMIN_PASSWORD);
     const session=configured?verify(jar[SESSION],env,stamp):null;
+    if(!/^\/admin(?:\/|$)/.test(path)&&!path.startsWith('/api/'))return {context:path.startsWith('/media/')&&session?{ADMIN_AUTHENTICATED:true}:{}};
     if(path==='/admin/login')return {response:new Response(null,{status:308,headers:{Location:'/admin/login/'}})};
     if(path==='/admin/login/'){
       if(!['GET','HEAD','POST'].includes(request.method))return {response:new Response(null,{status:405,headers:{Allow:'GET, HEAD, POST'}})};
@@ -66,8 +66,8 @@ export function createAdminAccess({now=()=>Date.now(),audit=entry=>console.info(
     }
     if(request.method==='POST'){
       if(request.headers.get('origin')!==url.origin||request.headers.get('sec-fetch-site')==='cross-site')return {response:problem('같은 사이트의 관리 화면에서 다시 시도해주세요.',403)};
-      if(Number(request.headers.get('content-length')??0)>1200000)return {response:problem('요청 크기가 너무 큽니다.',413)};
-      const raw=await request.clone().text();if(raw.length>1200000)return {response:problem('요청 크기가 너무 큽니다.',413)};
+      if(Number(request.headers.get('content-length')??0)>3500000)return {response:problem('요청 크기가 너무 큽니다.',413)};
+      const raw=await request.clone().text();if(raw.length>3500000)return {response:problem('요청 크기가 너무 큽니다.',413)};
       const csrf=request.headers.get('x-csrf-token')??new URLSearchParams(raw).get('csrf');
       if(!csrf||!equal(csrf,session.n))return {response:problem('화면을 새로고침한 후 다시 시도해주세요.',403)};
     }

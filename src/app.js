@@ -1,15 +1,17 @@
-import {hospital as h,categories,categoryName} from './hospital.js';
+import {hospital as h,categories,categoryName,homeMetadata} from './hospital.js';
 import {esc,validatePost,publicationData,safeLink,isTestPost,latestPosts} from './content.js';
 import {repository} from './repository.js';
 import * as v from './views.js';
 import * as admin from './admin-views.js';
 import {siteOrigin,articleSchema} from './seo.js';
+import {prepareHtmlPost,articleHtml} from './html-content.js';
+import {imageData} from './image-data.js';
 
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 const redirect=path=>new Response(null,{status:303,headers:{Location:path,'Cache-Control':'no-store'}});
 const xml=s=>esc(s);
 function parsePairs(value,names){return String(value??'').split('\n').filter(l=>l.trim()).map(line=>{const i=line.indexOf('|');return i<0?null:{[names[0]]:line.slice(0,i).trim(),[names[1]]:line.slice(i+1).trim()};}).filter(p=>p&&p[names[0]]&&p[names[1]]);}
-function parseForm(data){const keys=['id','title','category','excerpt','answer','takeaways','body','cover','imageAlt','author','reviewer','reviewedAt','seoTitle','description','status'];const p=Object.fromEntries(keys.map(k=>[k,String(data.get(k)??'').trim()]));p.reviewApproved=data.get('reviewApproved')==='yes';p.tags=String(data.get('tags')??'').split(',').map(t=>t.trim()).filter(Boolean).slice(0,15);p.sources=parsePairs(data.get('sourcesText'),['title','url']);p.faq=parsePairs(data.get('faqText'),['question','answer']);p.seoTitle||=p.title;p.description||=p.excerpt;return p;}
+function parseForm(data){const keys=['id','title','category','excerpt','answer','takeaways','body','cover','imageAlt','author','reviewer','reviewedAt','seoTitle','description','status'];const p=Object.fromEntries(keys.map(k=>[k,String(data.get(k)??'').trim()]));p.bodyFormat=data.get('bodyFormat')==='html'?'html':'markdown';p.reviewApproved=data.get('reviewApproved')==='yes';p.tags=String(data.get('tags')??'').split(',').map(t=>t.trim()).filter(Boolean).slice(0,15);p.sources=parsePairs(data.get('sourcesText'),['title','url']);p.faq=parsePairs(data.get('faqText'),['question','answer']);p.seoTitle||=p.title;p.description||=p.excerpt;return p;}
 export function createApp(assets={}) {
   return {async fetch(request,env={}) {
     try {
@@ -25,8 +27,8 @@ export function createApp(assets={}) {
       if(request.method==='POST'){
         if(request.headers.get('origin')!==url.origin||request.headers.get('sec-fetch-site')==='cross-site')return json({errors:['같은 사이트의 글쓰기 화면에서 다시 시도해주세요.']},403);
         if(!['/api/posts','/api/posts/status'].includes(path))return json({errors:['지원하지 않는 요청입니다.']},404);
-        if(Number(request.headers.get('content-length')??0)>1200000)return json({errors:['요청 크기가 너무 큽니다.']},413);
-        const raw=await request.text();if(raw.length>1200000)return json({errors:['요청 크기가 너무 큽니다.']},413);
+        if(Number(request.headers.get('content-length')??0)>3500000)return json({errors:['요청 크기가 너무 큽니다.']},413);
+        const raw=await request.text();if(raw.length>3500000)return json({errors:['요청 크기가 너무 큽니다.']},413);
         const data=new URLSearchParams(raw);
         if(env.CSRF_TOKEN&&data.get('csrf')!==env.CSRF_TOKEN)return json({errors:['화면을 새로고침한 후 다시 시도해주세요.']},403);
         if(path==='/api/posts/status'){
@@ -44,7 +46,9 @@ export function createApp(assets={}) {
         // Removed optional editor fields must not erase metadata on existing posts.
         for(const [field,key] of [['faqText','faq'],['sourcesText','sources'],['tags','tags']])if(!data.has(field))input[key]=old?.[key]??[];
         if(!['draft','medical_review','published','archived'].includes(input.status))return json({errors:['올바른 저장 상태를 선택해주세요.']},400);
-        const p=publicationData(input,old);const errors=validatePost(p,p.status==='published');
+        let p=publicationData(input,old);
+        if(p.bodyFormat==='html')try{p=prepareHtmlPost(p,old);}catch(error){return json({errors:[error.message]},422);}
+        const errors=validatePost(p,p.status==='published');
         if(errors.length)return json({errors},422);
         const all=await repo.list();if(p.status==='published'&&all.some(x=>x.id!==p.id&&x.status==='published'&&x.title.replace(/\s/g,'')===p.title.replace(/\s/g,'')))return json({errors:['동일한 제목의 발행 글이 있습니다. 기존 글을 수정해주세요.']},422);
         await repo.save(p);
@@ -55,6 +59,14 @@ export function createApp(assets={}) {
       // Consolidate aliases and slash variants with permanent redirects; removed pages remain 404.
       if(path==='/contact'||path==='/contact/')return new Response(null,{status:301,headers:{Location:'/location/'+url.search}});
       if(/^\/(?:health|clinic|location|privacy|editorial-policy|admin|admin\/(?:new|posts|settings)|health\/category\/[\w-]+|health\/[\w-]+|admin\/(?:edit|preview)\/[\w-]+)$/.test(path))return new Response(null,{status:308,headers:{Location:path+'/'+url.search}});
+      const inlineMedia=path.match(/^\/media\/([\w-]+)\/inline\/([\w-]+)$/);
+      if(inlineMedia){
+        const p=await repo.get(inlineMedia[1]),publicPost=p?.status==='published';
+        const item=p&&(publicPost||env.ADMIN_AUTHENTICATED===true)?p.inlineImages?.find(i=>i.id===inlineMedia[2]):null;
+        const image=imageData(item?.data,300*1024);
+        if(!image)return new Response(null,{status:404,headers:{'X-Robots-Tag':'noindex','Cache-Control':'no-store'}});
+        return new Response(Uint8Array.from(image.bytes,c=>c.charCodeAt(0)),{headers:{'Content-Type':image.mime,'Cache-Control':publicPost?'public, max-age=3600':'private, no-store','X-Content-Type-Options':'nosniff',...((!publicPost||previewHost||isTestPost(p))?{'X-Robots-Tag':'noindex'}:{})}});
+      }
       const media=path.match(/^\/media\/([\w-]+)\/cover$/);
       if(media){
         const p=await repo.get(media[1]);
@@ -72,7 +84,7 @@ export function createApp(assets={}) {
         const valid=Number.isInteger(page)&&page>=1&&page<=Math.max(1,Math.ceil(items.length/6));
         return {valid,page,path:path+(page>1?'?page='+page:''),pageType:'CollectionPage',noindex:url.searchParams.has('q')||!items.slice((page-1)*6,page*6).some(p=>!isTestPost(p))};
       }
-      if(path==='/')return frame('부산 양정 건강정보','양정베스트안과의원 건강정보. 건강정보와 병원소식, 진료분야 및 방문 안내를 확인하세요.',v.home(posts));
+      if(path==='/')return frame(homeMetadata.title,homeMetadata.description,v.home(posts));
       if(path==='/admin/')return url.searchParams.has('status')?redirect('/admin/posts/'+url.search):desk('대시보드',admin.dashboard(posts));
       if(path==='/admin/posts/')return desk('게시글 관리',admin.postsPage(posts,url.searchParams,{csrf:env.CSRF_TOKEN??''}));
       if(path==='/admin/settings/')return desk('운영 안내',admin.settingsPage({username:env.ADMIN_USERNAME,origin,indexing:!previewHost,local:env.LOCAL_PREVIEW===true}));
@@ -81,7 +93,7 @@ export function createApp(assets={}) {
       const preview=path.match(/^\/admin\/preview\/([\w-]+)\/$/);if(preview){const p=await repo.get(preview[1]);return p?desk('미리보기',`<div class="desk-preview"><a href="/admin/edit/${p.id}/" class="btn">편집 화면으로 ${v.icon('arrow',16)}</a>${v.article(p,posts,true)}</div>`):notFound();}
       if(path==='/health/'){const options=collectionOptions();if(!options.valid)return notFound();return frame('건강정보'+(options.page>1?' · '+options.page+'페이지':''),'눈 건강 정보와 병원소식을 주제별로 살펴보세요.',`<div class="wrap">${v.breadcrumb([{name:'건강정보'}])}${v.pageIntro('HEALTH JOURNAL','눈 건강을 읽다.','눈에 관한 질문과 일상의 건강을 잇는 이야기. 필요한 정보를 주제별로 찾아보세요.')}</div>${v.journal(posts,{query:url.searchParams.get('q')??'',page:Number(url.searchParams.get('page'))||1})}`,options);}
       const category=path.match(/^\/health\/category\/([\w-]+)\/$/);if(category){if(![...categories.map(c=>c.slug),'notice'].includes(category[1]))return notFound();const options=collectionOptions(category[1]);if(!options.valid)return notFound();return frame(categoryName(category[1])+' 이야기'+(options.page>1?' · '+options.page+'페이지':''),categories.find(c=>c.slug===category[1])?.intro??'병원의 소식과 진료 안내를 전합니다.',`<div class="wrap">${v.breadcrumb([{name:'건강정보',url:'/health/'},{name:categoryName(category[1])}])}${v.pageIntro('JOURNAL TOPICS',categoryName(category[1]),categories.find(c=>c.slug===category[1])?.intro??'병원의 새로운 소식과 일정을 안내합니다.')}</div>${v.journal(posts,{category:category[1],query:url.searchParams.get('q')??'',page:Number(url.searchParams.get('page'))||1})}`,{...options,breadcrumbs:[{name:'홈',url:'/'},{name:'건강정보',url:'/health/'},{name:categoryName(category[1]),url:options.path}]});}
-      const post=path.match(/^\/health\/([\w-]+)\/$/);if(post){const p=published.find(p=>p.id===post[1]);if(!p)return notFound();const schema=[articleSchema(p,origin,path)];if(p.faq?.length)schema.push(faqSchema(p.faq));return frame(p.seoTitle||p.title,p.description||p.excerpt,v.article(p,posts),{schema,post:p,pageType:p.category==='notice'?'WebPage':'MedicalWebPage',noindex:isTestPost(p),breadcrumbs:[{name:'홈',url:'/'},{name:'건강정보',url:'/health/'},{name:categoryName(p.category),url:'/health/category/'+p.category+'/'},{name:p.title,url:path}]});}
+      const post=path.match(/^\/health\/([\w-]+)\/$/);if(post){const p=published.find(p=>p.id===post[1]);if(!p)return notFound();const schema=[articleSchema(p,origin,path)];const faq=p.faq?.length?p.faq:p.bodyFormat==='html'?articleHtml(p.body).faq:[];if(faq.length)schema.push(faqSchema(faq));return frame(p.seoTitle||p.title,p.description||p.excerpt,v.article(p,posts),{schema,post:p,pageType:p.category==='notice'?'WebPage':'MedicalWebPage',noindex:isTestPost(p),breadcrumbs:[{name:'홈',url:'/'},{name:'건강정보',url:'/health/'},{name:categoryName(p.category),url:'/health/category/'+p.category+'/'},{name:p.title,url:path}]});}
       if(path==='/clinic/')return frame('병원안내','부산 양정베스트안과의 의료진 소개와 진료 공간, 진료시간 및 방문 안내',v.clinicPage());
       if(path==='/location/')return frame('오시는 길과 진료안내',h.address+' · 4층 접수·외래·검진, 5층 수술센터 · '+h.phone,v.locationPage(),{schema:[faqSchema(v.clinicFAQ.map(([question,answer])=>({question,answer})))]});
       if(path==='/privacy/')return frame('개인정보 안내','홈페이지 개인정보 및 게시판 운영 안내',`<section class="wrap policy">${v.pageIntro('PRIVACY','개인정보 안내')}<div class="prose"><h2>방문자 정보 입력</h2><p>이 홈페이지는 방문자 회원가입, 환자 상담 접수, 온라인 예약 및 결제 정보를 수집하지 않습니다. 진료 문의는 병원 전화로 안내합니다.</p><h2>게시판 정보</h2><p>관리자가 작성한 글, 작성자·검수자 이름 및 대표이미지는 운영 데이터베이스에 저장됩니다. 글에 환자 이름, 연락처, 진료기록 등 개인정보를 입력하지 마세요.</p><h2>접속 및 인증</h2><p>게시판 관리는 관리자 인증 후 이용합니다. 관리자 로그인 유지를 위해 최대 8시간의 필수 세션 쿠키를 사용하며, 로그인 성공·실패 이벤트는 서버 운영 로그에 기록합니다. 이 이벤트에는 아이디·비밀번호·원문 IP를 기록하지 않습니다. 비밀 키와 비밀번호는 방문자에게 공개하지 않습니다. 별도의 광고·방문자 분석 추적 스크립트는 설치하지 않았습니다.</p><h2>외부 지도</h2><p>오시는 길의 지도는 Google Maps에서 제공합니다. 지도 이용에는 <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google 개인정보처리방침</a>이 적용됩니다.</p><h2>문의</h2><p>개인정보 관련 문의: ${h.phone}. 실제 공개 운영 전 병원 담당자가 처리방침과 운영 주체를 최종 확인해야 합니다.</p></div></section>`,{noindex:true});

@@ -791,3 +791,6 @@ body{color:var(--ink);background:#fff;word-break:keep-all;font-size:16px;letter-
   .clinic-section-links { gap: 10px; }
   .clinic-section-links a { gap: 14px; padding: 12px 14px; }
 }
+
+/* Published HTML article media. */
+.prose img{display:block;max-width:100%;height:auto;margin:24px auto}.prose iframe,.prose video{display:block;width:100%;max-width:100%;height:auto;aspect-ratio:16/9;border:0;margin:26px 0;background:#f3f5f9}.prose blockquote{border-left:3px solid var(--brand);padding:14px 22px;background:var(--pale);margin:23px 0}.prose pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--paper);padding:20px;font-size:16px}.prose table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;margin:25px 0}.prose th,.prose td{border:1px solid var(--line);padding:12px 16px;min-width:100px;font-size:16px}.prose th{background:var(--paper)}.prose .ql-align-center{text-align:center}.prose .ql-align-right{text-align:right}.prose .ql-align-justify{text-align:justify}

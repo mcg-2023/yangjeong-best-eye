@@ -12,8 +12,14 @@
     "check": "node scripts/check.mjs",
     "seed:test": "node scripts/seed-test-posts.mjs"
   },
-  "engines": {"node": "24.x"},
+  "engines": {
+    "node": "24.x"
+  },
   "devDependencies": {
+    "quill": "2.0.3",
     "vite": "8.3.4"
+  },
+  "dependencies": {
+    "parse5": "8.0.1"
   }
 }

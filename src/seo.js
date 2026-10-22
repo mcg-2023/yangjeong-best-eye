@@ -1,4 +1,4 @@
-import {hospital as h,categoryName} from './hospital.js';
+import {hospital as h,categoryName,homeMetadata} from './hospital.js';
 import {esc,safeLink,coverUrl} from './content.js';
 
 // Set SITE_URL to the final public origin. Never derive production canonicals from a preview host.
@@ -14,12 +14,12 @@ export function breadcrumbSchema(items,origin) {
 export function articleSchema(post,origin,path) {
   return {'@type':'BlogPosting','@id':origin+path+'#article',url:origin+path,headline:post.title,description:post.excerpt,
     inLanguage:'ko-KR',image:[origin+coverUrl(post)],datePublished:post.publishedAt,dateModified:post.updatedAt,
-    author:{'@type':'Person',name:post.author},publisher:{'@id':origin+'/#clinic'},mainEntityOfPage:{'@id':origin+path+'#page'},
+    author:[h.name,h.shortName].includes(post.author)?{'@id':origin+'/#clinic'}:{'@type':'Person',name:post.author},publisher:{'@id':origin+'/#clinic'},mainEntityOfPage:{'@id':origin+path+'#page'},
     articleSection:categoryName(post.category),keywords:(post.tags??[]).join(', '),
     citation:(post.sources??[]).filter(s=>s.title&&safeLink(s.url)).map(s=>({'@type':'CreativeWork',name:s.title,url:safeLink(s.url)}))};
 }
 export function metadataHead({title,description,path,origin,noindex=false,schema=[],pageType='WebPage',breadcrumbs=[],post,verification={}}) {
-  const canonical=origin+path,fullTitle=title+' | '+h.shortName;
+  const canonical=origin+path,fullTitle=path==='/'?homeMetadata.title:title+' | '+h.shortName;
   const image=origin+(post?coverUrl(post):'/assets/main_sd1.webp');
   const page={'@type':pageType,'@id':canonical+'#page',url:canonical,name:title,description,inLanguage:'ko-KR',isPartOf:{'@id':origin+'/#website'},publisher:{'@id':origin+'/#clinic'}};
   if(post){page.mainEntity={'@id':canonical+'#article'};if(post.reviewApproved&&post.reviewer&&post.reviewedAt){page.reviewedBy={'@type':'Person',name:post.reviewer};page.lastReviewed=post.reviewedAt;}}

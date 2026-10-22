@@ -1,3 +1,5 @@
+import {imageData} from './image-data.js';
+import {articleHtml} from './html-content.js';
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function safeLink(value) {
   try { const u=new URL(value); return ['https:','http:'].includes(u.protocol)?u.href:''; } catch {return '';}
@@ -21,24 +23,17 @@ export const headings = body => Array.from(String(body??'').matchAll(/^#{2,3} (.
 export const isTestPost = post => post.id?.startsWith('test-journal-') === true;
 export const coverUrl = post => post.cover ? `/media/${encodeURIComponent(post.id)}/cover?v=${encodeURIComponent(post.updatedAt??post.publishedAt??'1')}` : '/assets/main_sd1.webp';
 export const latestPosts = posts => posts.filter(p=>p.status==='published').sort((a,b)=>(b.publishedAt??b.createdAt??'').localeCompare(a.publishedAt??a.createdAt??'')||a.id.localeCompare(b.id));
-export function validCover(value){
-  if(typeof value!=='string'||value.length>750000)return false;
-  const match=value.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/);if(!match)return false;
-  try{
-    const bytes=atob(match[2]);
-    if(bytes.length>500*1024)return false;
-    if(match[1]==='png')return bytes.startsWith('\x89PNG\r\n\x1a\n')&&bytes.length>=24&&bytes.slice(12,16)==='IHDR';
-    if(match[1]==='jpeg')return bytes.startsWith('\xff\xd8\xff')&&bytes.endsWith('\xff\xd9');
-    return bytes.length>=20&&bytes.slice(0,4)==='RIFF'&&bytes.slice(8,12)==='WEBP'&&['VP8 ','VP8L','VP8X'].includes(bytes.slice(12,16));
-  }catch{return false;}
-}
+export const validCover=value=>Boolean(imageData(value));
+export const postText=post=>post.bodyFormat==='html'?articleHtml(post.body).text:String(post.body??'');
+export const postHeadings=post=>post.bodyFormat==='html'?articleHtml(post.body).headings:headings(post.body);
+export const postBody=post=>post.bodyFormat==='html'?articleHtml(post.body).html:markdown(post.body);
 export function validatePost(post, publishing=false) {
   const errors=[];
   if(!post.title?.trim())errors.push('제목을 입력해주세요.');
   if((post.title??'').length>150)errors.push('제목은 150자 이하로 입력해주세요.');
   if(!['cataract','children','dry-eye','retina','glaucoma','notice'].includes(post.category))errors.push('주제를 선택해주세요.');
-  if(!post.body?.trim())errors.push('본문을 입력해주세요.');
-  if((post.body??'').length>80000)errors.push('본문은 80,000자 이하로 입력해주세요.');
+  if(!post.body?.trim()||(post.bodyFormat==='html'&&!postText(post).trim()&&!/<(?:img|video|iframe)\b/.test(post.body)))errors.push('본문을 입력해주세요.');
+  if(postText(post).length>80000||(post.body??'').length>(post.bodyFormat==='html'?200000:80000))errors.push('본문은 80,000자 이하로 입력해주세요.');
   if(post.cover&&!validCover(post.cover))errors.push('실제 이미지 파일인 500KB 이하의 PNG, JPG, WebP를 사용해주세요.');
   if(post.cover&&!post.imageAlt?.trim())errors.push('대표이미지 설명을 입력해주세요.');
   if(publishing){

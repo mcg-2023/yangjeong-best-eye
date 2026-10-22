@@ -1,6 +1,8 @@
 import {build} from 'vite';
 import {mkdir,writeFile,readFile,cp} from 'node:fs/promises';
 import {getAssets} from './assets.mjs';
+import {buildEditorAssets} from './build-editor.mjs';
+await buildEditorAssets();
 await mkdir('.generated',{recursive:true});
 await writeFile('.generated/worker.js',`import {createApp} from '../src/app.js';\nexport default createApp(${JSON.stringify(await getAssets())});\n`);
 await build({configFile:false,publicDir:false,build:{outDir:'dist/server',emptyOutDir:true,lib:{entry:'.generated/worker.js',formats:['es'],fileName:()=> 'index.js'},rollupOptions:{output:{inlineDynamicImports:true}},minify:true}});
