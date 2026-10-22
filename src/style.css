@@ -735,7 +735,7 @@ body{color:var(--ink);background:#fff;word-break:keep-all;font-size:16px;letter-
 .care-summary { font-size: 16px; line-height: 1.75; color: var(--muted); margin-top: 9px; }
 .visit-reception { color: var(--brand); font-size: 16px; font-weight: 600; margin-top: 12px; }
 .clinic-spaces { background: var(--paper); padding-block: 64px; }
-.clinic-spaces-description { color: var(--muted); font-size: 16px; line-height: 1.8; }
+.clinic-spaces-description { color: var(--muted); font-size: 16px; line-height: 1.8; margin-top: 12px; }
 .clinic-space-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
 .clinic-space-card { min-width: 0; margin: 0; }
 .clinic-space-card > img { width: 100%; height: auto; aspect-ratio: 3 / 4; object-fit: cover; background: #eee; }
