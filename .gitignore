@@ -9,3 +9,4 @@ dist/
 asset-review.jpg
 .generated/
 .vercel/
+artifacts/

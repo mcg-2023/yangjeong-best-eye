@@ -1,0 +1,6 @@
+node_modules/
+public/page-manager/
+.data/
+.env*
+!.env.example
+.vercel/

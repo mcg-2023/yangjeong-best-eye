@@ -87,3 +87,11 @@ npm run check
 홈 상단은 최신 발행 글 3개를 크게 표시하며 6초 간격으로 전환합니다. 700ms 페이드 전환과 이전·다음·자동 넘김 일시정지를 지원하며, 마우스를 올리거나 키보드로 조작하는 동안에는 자동 전환을 멈춥니다. 모션 감소 설정에서는 자동 전환을 시작하지 않고 페이드 효과를 생략합니다. 저널 사이드바를 제거하고 넓은 화면은 3열, 태블릿은 2열, 모바일은 1열로 게시글을 배치합니다.
 
 `npm run seed:test`는 로컬 DB에 TEST 게시글 3개를 추가합니다. 같은 글이 이미 있으면 덮어쓰지 않습니다. 테스트 글은 관리 화면에서 수정·보관할 수 있고, 검색용 사이트맵과 RSS에서 제외되며 글 상세는 noindex입니다. 의료정보나 실제 병원 운영 공지로 작성하지 않았습니다.
+
+## 다른 홈페이지에서 관리자 재사용
+
+관리자·게시글 에디터·인증·미디어·보관·삭제는 공통 모듈 `packages/page-manager`로 통합했습니다. 현재 사이트도 이 모듈을 사용하며 사이트별 설정은 `src/page-manager-config.js`에 있습니다.
+
+- 사용방법: [Page Manager 안내](packages/page-manager/README.md)
+- 새 사이트 예제: [시작 프로젝트](examples/page-manager-starter/README.md)
+- `npm run export:manager`: `artifacts/page-manager-kit/`에 설치 가능한 tgz와 독립 실행 starter를 만듭니다. 병원 자료·게시글·환경변수 비밀 값은 포함하지 않습니다.

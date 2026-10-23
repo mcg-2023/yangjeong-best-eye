@@ -1,0 +1,38 @@
+{
+  "name": "@mcg/page-manager",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Reusable Korean website administration and rich post editor",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./content": "./src/content.js",
+    "./html": "./src/html-content.js",
+    "./supabase": "./src/supabase-database.js",
+    "./build": "./scripts/build.mjs",
+    "./sqlite": "./src/sqlite-database.js",
+    "./assets": "./scripts/assets.mjs"
+  },
+  "files": [
+    "src",
+    "assets",
+    "dist",
+    "migrations",
+    "scripts",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "parse5": "8.0.1"
+  },
+  "devDependencies": {
+    "quill": "2.0.3",
+    "vite": "8.3.4"
+  }
+}

@@ -1,18 +1,16 @@
 import {hospital as h,categories,categoryName,homeMetadata} from './hospital.js';
-import {esc,validatePost,publicationData,safeLink,isTestPost,latestPosts} from './content.js';
+import {esc,isTestPost,latestPosts} from './content.js';
 import {repository} from './repository.js';
 import * as v from './views.js';
 import * as admin from './admin-views.js';
 import {siteOrigin,articleSchema} from './seo.js';
-import {prepareHtmlPost,articleHtml} from './html-content.js';
-import {imageData} from './image-data.js';
+import {articleHtml} from './html-content.js';
+import {createManagerRoutes} from '../packages/page-manager/src/routes.js';
+import {pageManagerConfig} from './page-manager-config.js';
 
-const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
-const redirect=path=>new Response(null,{status:303,headers:{Location:path,'Cache-Control':'no-store'}});
 const xml=s=>esc(s);
-function parsePairs(value,names){return String(value??'').split('\n').filter(l=>l.trim()).map(line=>{const i=line.indexOf('|');return i<0?null:{[names[0]]:line.slice(0,i).trim(),[names[1]]:line.slice(i+1).trim()};}).filter(p=>p&&p[names[0]]&&p[names[1]]);}
-function parseForm(data){const keys=['id','title','category','excerpt','answer','takeaways','body','cover','imageAlt','author','reviewer','reviewedAt','seoTitle','description','status'];const p=Object.fromEntries(keys.map(k=>[k,String(data.get(k)??'').trim()]));p.bodyFormat=data.get('bodyFormat')==='html'?'html':'markdown';p.reviewApproved=data.get('reviewApproved')==='yes';p.tags=String(data.get('tags')??'').split(',').map(t=>t.trim()).filter(Boolean).slice(0,15);p.sources=parsePairs(data.get('sourcesText'),['title','url']);p.faq=parsePairs(data.get('faqText'),['question','answer']);p.seoTitle||=p.title;p.description||=p.excerpt;return p;}
 export function createApp(assets={}) {
+  const manager=createManagerRoutes(pageManagerConfig,{renderPreview:(p,posts)=>v.article(p,posts,true)});
   return {async fetch(request,env={}) {
     try {
       const url=new URL(request.url),path=url.pathname;
@@ -20,70 +18,15 @@ export function createApp(assets={}) {
       const isAdmin=path.startsWith('/admin')||path.startsWith('/api/');
       const authorized=env.LOCAL_PREVIEW===true||env.ADMIN_AUTHENTICATED===true||(!env.VERCEL_RUNTIME&&Boolean(request.headers.get('oai-authenticated-user-id')));
       if(isAdmin&&!authorized){return new Response('사이트 소유자 로그인이 필요합니다.',{status:403,headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'}});}
-      if(path==='/admin/login/'&&env.LOCAL_PREVIEW)return admin.loginPage({local:true});
+      const managed=await manager.fetch(request,{...env,ADMIN_AUTHENTICATED:isAdmin?authorized:env.ADMIN_AUTHENTICATED});
+      if(managed)return managed;
       if(!env.DB) return new Response('게시판 데이터베이스를 연결하지 못했습니다. 관리자에게 문의해주세요.',{status:503,headers:{'Content-Type':'text/plain; charset=utf-8'}});
       const repo=repository(env.DB),origin=siteOrigin(env.SITE_URL,url.origin);
       const previewHost=env.LOCAL_PREVIEW===true||env.SITE_INDEXING==='off'||origin!==url.origin;
-      if(request.method==='POST'){
-        if(request.headers.get('origin')!==url.origin||request.headers.get('sec-fetch-site')==='cross-site')return json({errors:['같은 사이트의 글쓰기 화면에서 다시 시도해주세요.']},403);
-        if(!['/api/posts','/api/posts/status','/api/posts/delete'].includes(path))return json({errors:['지원하지 않는 요청입니다.']},404);
-        if(Number(request.headers.get('content-length')??0)>3500000)return json({errors:['요청 크기가 너무 큽니다.']},413);
-        const raw=await request.text();if(raw.length>3500000)return json({errors:['요청 크기가 너무 큽니다.']},413);
-        const data=new URLSearchParams(raw);
-        if(env.CSRF_TOKEN&&data.get('csrf')!==env.CSRF_TOKEN)return json({errors:['화면을 새로고침한 후 다시 시도해주세요.']},403);
-        if(path==='/api/posts/delete'){
-          const id=data.get('id')??'';
-          if(!/^[\w-]+$/.test(id))return json({errors:['글을 찾을 수 없습니다.']},404);
-          if(data.get('confirmDelete')!=='yes')return json({errors:['삭제 확인 화면에서 다시 시도해주세요.']},400);
-          const old=await repo.get(id);
-          if(!old)return json({errors:['글을 찾을 수 없습니다.']},404);
-          await repo.delete(id);
-          return request.headers.get('accept')?.includes('application/json')?json({message:'글을 삭제했습니다.',url:'/admin/posts/?deleted=1'}):redirect('/admin/posts/?deleted=1');
-        }
-        if(path==='/api/posts/status'){
-          const old=await repo.get(data.get('id')??''),status=data.get('status');
-          if(!old)return json({errors:['글을 찾을 수 없습니다.']},404);
-          if(!['draft','archived'].includes(status))return json({errors:['보관 또는 초안 복원만 가능합니다.']},400);
-          if(status==='draft'&&old.status!=='archived')return json({errors:['보관된 글만 초안으로 복원할 수 있습니다.']},400);
-          await repo.save({...old,status,reviewApproved:false,updatedAt:new Date().toISOString()});
-          const message=status==='archived'?'글을 보관했습니다.':'글을 초안으로 복원했습니다.';
-          return request.headers.get('accept')?.includes('application/json')?json({data:{id:old.id,status},message}):redirect('/admin/posts/?status='+status);
-        }
-        const input=parseForm(data);
-        const old=input.id?await repo.get(input.id):null;
-        if(input.id&&!old)return json({errors:['글을 찾을 수 없습니다.']},404);
-        // Removed optional editor fields must not erase metadata on existing posts.
-        for(const [field,key] of [['faqText','faq'],['sourcesText','sources'],['tags','tags']])if(!data.has(field))input[key]=old?.[key]??[];
-        if(!['draft','medical_review','published','archived'].includes(input.status))return json({errors:['올바른 저장 상태를 선택해주세요.']},400);
-        let p=publicationData(input,old);
-        if(p.bodyFormat==='html')try{p=prepareHtmlPost(p,old);}catch(error){return json({errors:[error.message]},422);}
-        const errors=validatePost(p,p.status==='published');
-        if(errors.length)return json({errors},422);
-        const all=await repo.list();if(p.status==='published'&&all.some(x=>x.id!==p.id&&x.status==='published'&&x.title.replace(/\s/g,'')===p.title.replace(/\s/g,'')))return json({errors:['동일한 제목의 발행 글이 있습니다. 기존 글을 수정해주세요.']},422);
-        await repo.save(p);
-        if(request.headers.get('accept')?.includes('application/json'))return json({id:p.id,status:p.status,url:'/admin/edit/'+p.id+'/',message:p.status==='published'?'글을 발행했습니다.':'글을 저장했습니다.'});
-        return redirect('/admin/edit/'+p.id+'/');
-      }
-      if(!['GET','HEAD'].includes(request.method))return new Response(null,{status:405,headers:{Allow:'GET, HEAD, POST'}});
-      if(path==='/api/posts/delete')return new Response(null,{status:405,headers:{Allow:'POST'}});
+      if(!['GET','HEAD'].includes(request.method))return new Response(null,{status:405,headers:{Allow:'GET, HEAD'}});
       // Consolidate aliases and slash variants with permanent redirects; removed pages remain 404.
       if(path==='/contact'||path==='/contact/')return new Response(null,{status:301,headers:{Location:'/location/'+url.search}});
       if(/^\/(?:health|clinic|location|privacy|editorial-policy|admin|admin\/(?:new|posts|settings)|health\/category\/[\w-]+|health\/[\w-]+|admin\/(?:edit|preview)\/[\w-]+)$/.test(path))return new Response(null,{status:308,headers:{Location:path+'/'+url.search}});
-      const inlineMedia=path.match(/^\/media\/([\w-]+)\/inline\/([\w-]+)$/);
-      if(inlineMedia){
-        const p=await repo.get(inlineMedia[1]),publicPost=p?.status==='published';
-        const item=p&&(publicPost||env.ADMIN_AUTHENTICATED===true)?p.inlineImages?.find(i=>i.id===inlineMedia[2]):null;
-        const image=imageData(item?.data,300*1024);
-        if(!image)return new Response(null,{status:404,headers:{'X-Robots-Tag':'noindex','Cache-Control':'no-store'}});
-        return new Response(Uint8Array.from(image.bytes,c=>c.charCodeAt(0)),{headers:{'Content-Type':image.mime,'Cache-Control':publicPost?'public, max-age=3600':'private, no-store','X-Content-Type-Options':'nosniff',...((!publicPost||previewHost||isTestPost(p))?{'X-Robots-Tag':'noindex'}:{})}});
-      }
-      const media=path.match(/^\/media\/([\w-]+)\/cover$/);
-      if(media){
-        const p=await repo.get(media[1]);
-        const image=p?.status==='published'&&p.cover?.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
-        if(!image)return new Response(null,{status:404,headers:{'X-Robots-Tag':'noindex','Cache-Control':'no-store'}});
-        return new Response(Uint8Array.from(atob(image[2]),c=>c.charCodeAt(0)),{headers:{'Content-Type':image[1],'Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff',...((previewHost||isTestPost(p))?{'X-Robots-Tag':'noindex'}:{})}});
-      }
       const posts=await repo.list(),published=latestPosts(posts),indexable=published.filter(p=>!isTestPost(p));
       const labels={'/health/':'건강정보','/clinic/':'병원안내','/location/':'오시는 길','/privacy/':'개인정보 안내','/editorial-policy/':'콘텐츠 운영원칙'};
       const frame=(title,description,body,options={})=>v.layout({title,description,body,path,origin,breadcrumbs:labels[path]?[{name:'홈',url:'/'},{name:labels[path],url:path}]:[],verification:{'google-site-verification':env.GOOGLE_SITE_VERIFICATION,'naver-site-verification':env.NAVER_SITE_VERIFICATION},...options,noindex:previewHost||options.noindex===true});
@@ -95,13 +38,6 @@ export function createApp(assets={}) {
         return {valid,page,path:path+(page>1?'?page='+page:''),pageType:'CollectionPage',noindex:url.searchParams.has('q')||!items.slice((page-1)*6,page*6).some(p=>!isTestPost(p))};
       }
       if(path==='/')return frame(homeMetadata.title,homeMetadata.description,v.home(posts));
-      if(path==='/admin/')return url.searchParams.has('status')?redirect('/admin/posts/'+url.search):desk('대시보드',admin.dashboard(posts));
-      if(path==='/admin/posts/')return desk('게시글 관리',admin.postsPage(posts,url.searchParams,{csrf:env.CSRF_TOKEN??''}));
-      if(path==='/admin/settings/')return desk('운영 안내',admin.settingsPage({username:env.ADMIN_USERNAME,origin,indexing:!previewHost,local:env.LOCAL_PREVIEW===true}));
-      if(path==='/admin/new/')return desk('새 글 작성',admin.editorPage({},env.CSRF_TOKEN??''));
-      const deletion=path.match(/^\/admin\/delete\/([\w-]+)\/$/);if(deletion){const p=await repo.get(deletion[1]);return p?desk('게시글 삭제',admin.deletePage(p,env.CSRF_TOKEN??'')):notFound();}
-      const edit=path.match(/^\/admin\/edit\/([\w-]+)\/$/);if(edit){const p=await repo.get(edit[1]);return p?desk('글 수정',admin.editorPage(p,env.CSRF_TOKEN??'')):notFound();}
-      const preview=path.match(/^\/admin\/preview\/([\w-]+)\/$/);if(preview){const p=await repo.get(preview[1]);return p?desk('미리보기',`<div class="desk-preview"><a href="/admin/edit/${p.id}/" class="btn">편집 화면으로 ${v.icon('arrow',16)}</a>${v.article(p,posts,true)}</div>`):notFound();}
       if(path==='/health/'){const options=collectionOptions();if(!options.valid)return notFound();return frame('건강정보'+(options.page>1?' · '+options.page+'페이지':''),'눈 건강 정보와 병원소식을 주제별로 살펴보세요.',`<div class="wrap">${v.breadcrumb([{name:'건강정보'}])}${v.pageIntro('HEALTH JOURNAL','눈 건강을 읽다.','눈에 관한 질문과 일상의 건강을 잇는 이야기. 필요한 정보를 주제별로 찾아보세요.')}</div>${v.journal(posts,{query:url.searchParams.get('q')??'',page:Number(url.searchParams.get('page'))||1})}`,options);}
       const category=path.match(/^\/health\/category\/([\w-]+)\/$/);if(category){if(![...categories.map(c=>c.slug),'notice'].includes(category[1]))return notFound();const options=collectionOptions(category[1]);if(!options.valid)return notFound();return frame(categoryName(category[1])+' 이야기'+(options.page>1?' · '+options.page+'페이지':''),categories.find(c=>c.slug===category[1])?.intro??'병원의 소식과 진료 안내를 전합니다.',`<div class="wrap">${v.breadcrumb([{name:'건강정보',url:'/health/'},{name:categoryName(category[1])}])}${v.pageIntro('JOURNAL TOPICS',categoryName(category[1]),categories.find(c=>c.slug===category[1])?.intro??'병원의 새로운 소식과 일정을 안내합니다.')}</div>${v.journal(posts,{category:category[1],query:url.searchParams.get('q')??'',page:Number(url.searchParams.get('page'))||1})}`,{...options,breadcrumbs:[{name:'홈',url:'/'},{name:'건강정보',url:'/health/'},{name:categoryName(category[1]),url:options.path}]});}
       const post=path.match(/^\/health\/([\w-]+)\/$/);if(post){const p=published.find(p=>p.id===post[1]);if(!p)return notFound();const schema=[articleSchema(p,origin,path)];const faq=p.faq?.length?p.faq:p.bodyFormat==='html'?articleHtml(p.body).faq:[];if(faq.length)schema.push(faqSchema(faq));return frame(p.seoTitle||p.title,p.description||p.excerpt,v.article(p,posts),{schema,post:p,pageType:p.category==='notice'?'WebPage':'MedicalWebPage',noindex:isTestPost(p),breadcrumbs:[{name:'홈',url:'/'},{name:'건강정보',url:'/health/'},{name:categoryName(p.category),url:'/health/category/'+p.category+'/'},{name:p.title,url:path}]});}
