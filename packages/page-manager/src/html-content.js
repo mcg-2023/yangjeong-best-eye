@@ -28,6 +28,18 @@ function imageUrl(src){
   const url=safeArticleUrl(src);
   return url&&(url.startsWith('https://')||/^\/(?:assets\/|media\/[\w-]+\/inline\/)/.test(url))?url:'';
 }
+// Media widths are deliberately independent of general inline styles.
+export function mediaWidth(value){
+  const width=String(value??'').trim().toLowerCase();
+  if(/^\d{1,3}%$/.test(width)&&parseInt(width)>=10&&parseInt(width)<=100)return parseInt(width)+'%';
+  if(/^\d{1,4}(?:px)?$/.test(width)&&parseInt(width)>=1&&parseInt(width)<=4096)return parseInt(width)+'px';
+  return '';
+}
+function mediaStyle(attrs){
+  const declaration=String(attrs.style??'').split(';').map(item=>item.trim()).find(item=>/^width\s*:/i.test(item));
+  const width=mediaWidth(declaration?.slice(declaration.indexOf(':')+1))||mediaWidth(attrs.width);
+  return width?` style="width:${width}"`:'';
+}
 function safeStyle(value){
   const styles=[];
   for(const item of String(value??'').split(';')){
@@ -50,11 +62,12 @@ export function articleHtml(value,{image=src=>imageUrl(src)}={}){
     if(tag==='iframe'||tag==='video'){
       const source=videoSource(attrs.src||(node.childNodes??[]).find(n=>n.tagName==='source')?.attrs?.find(a=>a.name==='src')?.value);
       if(!source)return '';
-      return source.kind==='iframe'?`<iframe src="${escape(source.src)}" title="${escape(attrs.title||'본문 동영상')}" loading="lazy" allow="fullscreen; picture-in-picture; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`:`<video src="${escape(source.src)}" controls playsinline preload="metadata"></video>`;
+      const size=mediaStyle(attrs);
+      return source.kind==='iframe'?`<iframe src="${escape(source.src)}"${size} title="${escape(attrs.title||'본문 동영상')}" loading="lazy" allow="fullscreen; picture-in-picture; encrypted-media" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`:`<video src="${escape(source.src)}"${size} controls playsinline preload="metadata"></video>`;
     }
     if(tag==='img'){
       const src=image(String(attrs.src??''),String(attrs.alt??''));
-      return src?`<img src="${escape(src)}" alt="${escape(attrs.alt??'')}" loading="lazy" decoding="async" referrerpolicy="no-referrer">`:'';
+      return src?`<img src="${escape(src)}" alt="${escape(attrs.alt??'')}"${mediaStyle(attrs)} loading="lazy" decoding="async" referrerpolicy="no-referrer">`:'';
     }
     const children=()=> (node.childNodes??[]).map(n=>render(n,depth+1)).join('');
     if(!allowed.has(tag))return children();

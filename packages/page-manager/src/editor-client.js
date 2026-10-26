@@ -1,7 +1,7 @@
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 import './editor.css';
-import {articleHtml,videoSource} from './html-content.js';
+import {articleHtml,videoSource,mediaWidth} from './html-content.js';
 import {markdown,esc} from './content.js';
 
 const form=document.querySelector('#post-editor');
@@ -9,27 +9,70 @@ if(form)setup();
 function setup(){
   const $=selector=>document.querySelector(selector),body=$('#field-body'),format=$('#body-format');
   const visualPanel=$('#rich-visual-panel'),tabs=$('#rich-view-tabs'),note=$('#rich-code-note'),markdownTools=$('[data-markdown-tools]');
-  const BaseImage=Quill.import('formats/image'),BlockEmbed=Quill.import('blots/block/embed');
+  const BaseImage=Quill.import('formats/image'),BaseVideo=Quill.import('formats/video'),BlockEmbed=Quill.import('blots/block/embed');
+  const widthOf=node=>mediaWidth(node.style.width)||mediaWidth(node.getAttribute('width'));
+  const setWidth=(node,value)=>{node.removeAttribute('width');node.removeAttribute('height');const width=mediaWidth(value);if(width)node.style.width=width;else node.style.removeProperty('width');};
   class DescribedImage extends BaseImage{
     static create(value){const node=super.create(typeof value==='string'?value:value.src);if(typeof value==='object')node.setAttribute('alt',value.alt??'');return node;}
     static value(node){return {src:node.getAttribute('src'),alt:node.getAttribute('alt')??''};}
+    static formats(node){return {alt:node.getAttribute('alt')??'',...(widthOf(node)?{width:widthOf(node)}:{})};}
+    format(name,value){if(name==='width')setWidth(this.domNode,value);else super.format(name,value);}
+  }
+  class ResizableVideo extends BaseVideo{
+    static create(value){const node=super.create(value);node.setAttribute('title','본문 동영상');node.setAttribute('referrerpolicy','strict-origin-when-cross-origin');node.setAttribute('allow','fullscreen; picture-in-picture; encrypted-media');return node;}
+    static formats(node){return widthOf(node)?{width:widthOf(node)}:{};}
+    format(name,value){if(name==='width')setWidth(this.domNode,value);else super.format(name,value);}
+    html(){return this.domNode.outerHTML;}
   }
   class FileVideo extends BlockEmbed{
     static blotName='fileVideo';static tagName='video';
     static create(value){const node=super.create();node.setAttribute('src',videoSource(value)?.src??'');node.setAttribute('controls','');node.setAttribute('playsinline','');node.setAttribute('preload','metadata');return node;}
     static value(node){return node.getAttribute('src');}
+    static formats(node){return widthOf(node)?{width:widthOf(node)}:{};}
+    format(name,value){if(name==='width')setWidth(this.domNode,value);else super.format(name,value);}
+    html(){return this.domNode.outerHTML;}
   }
-  Quill.register(DescribedImage,true);Quill.register(FileVideo,true);
-  let view='visual',visualDirty=false,mediaKind='image',bookmark=null,uploadData='',uploadVersion=0;
+  Quill.register(DescribedImage,true);Quill.register(ResizableVideo,true);Quill.register(FileVideo,true);
+  let view='visual',visualDirty=false,mediaKind='image',bookmark=null,uploadData='',uploadVersion=0,selectedMedia=null;
   const feedback=message=>{const node=$('#editor-feedback');node.textContent=message;node.hidden=false;node.focus();};
   const changed=()=>form.dispatchEvent(new Event('input',{bubbles:true}));
   const quill=new Quill('#rich-visual',{theme:'snow',placeholder:'본문을 작성하고 이미지나 동영상을 넣어보세요.',formats:['header','bold','italic','underline','strike','list','blockquote','link','image','video','fileVideo','align','color','code'],modules:{toolbar:{container:'#rich-toolbar',handlers:{image:()=>openMedia('image'),video:()=>openMedia('video')}}}});
+  const mediaControls=document.createElement('div');mediaControls.className='rich-media-size';
+  mediaControls.innerHTML='<div class="rich-media-size-heading"><label for="rich-media-select">이미지·동영상 크기</label><select id="rich-media-select" aria-label="크기를 조절할 이미지 또는 동영상"><option value="">본문에 미디어를 넣어주세요</option></select></div><div class="rich-media-size-options"><label for="rich-media-width">너비</label><input type="range" id="rich-media-width" min="10" max="100" step="1" value="100" disabled><output id="rich-media-width-value" for="rich-media-width" aria-live="polite">자동</output><div class="rich-media-size-presets">'+[25,50,75,100].map(size=>`<button type="button" data-media-width="${size}%" disabled>${size}%</button>`).join('')+'<button type="button" data-media-width="" disabled>자동</button></div></div><p>이미지나 동영상을 선택해 너비를 조절하세요. 높이는 비율에 맞게 자동 조절됩니다.</p><p id="rich-media-video-note" hidden>동영상 재생은 미리보기에서 확인하세요. 외부 재생이 제한된 영상은 원본에서 볼 수 있습니다. <a id="rich-media-open" target="_blank" rel="noopener">원본 영상 열기</a></p>';
+  visualPanel.append(mediaControls);
+  const mediaSelect=$('#rich-media-select'),widthSlider=$('#rich-media-width'),widthValue=$('#rich-media-width-value');
+  const mediaNodes=()=>Array.from(quill.root.querySelectorAll('img,iframe,video'));
+  function refreshMedia(){
+    const nodes=mediaNodes();if(!nodes.includes(selectedMedia))selectedMedia=null;
+    mediaSelect.replaceChildren(new Option(nodes.length?'크기를 조절할 항목 선택':'본문에 미디어를 넣어주세요',''));
+    nodes.forEach((node,index)=>mediaSelect.add(new Option(`${index+1}. ${node.tagName==='IMG'?'이미지':'동영상'}${node.alt?' · '+node.alt:''}`,String(index))));
+    mediaSelect.disabled=!nodes.length;mediaSelect.value=selectedMedia?String(nodes.indexOf(selectedMedia)):'';
+    const width=selectedMedia?widthOf(selectedMedia):'',percent=width.endsWith('%')?parseInt(width):selectedMedia?Math.round(selectedMedia.getBoundingClientRect().width/(quill.root.clientWidth-parseFloat(getComputedStyle(quill.root).paddingLeft)-parseFloat(getComputedStyle(quill.root).paddingRight))*100):100;
+    widthSlider.value=String(Math.max(10,Math.min(100,percent)));widthSlider.disabled=!selectedMedia;widthValue.textContent=width||'자동';
+    mediaControls.querySelectorAll('[data-media-width]').forEach(button=>{button.disabled=!selectedMedia;button.setAttribute('aria-pressed',String(!!selectedMedia&&button.dataset.mediaWidth===width));});
+    nodes.forEach(node=>node.classList.toggle('rich-media-selected',node===selectedMedia));
+    const video=selectedMedia&&selectedMedia.tagName!=='IMG'?videoSource(selectedMedia.getAttribute('src')):null;
+    $('#rich-media-video-note').hidden=!video;
+    if(video){const url=new URL(video.src);$('#rich-media-open').href=url.hostname==='www.youtube-nocookie.com'?'https://www.youtube.com/watch?v='+url.pathname.split('/').pop():url.hostname==='player.vimeo.com'?'https://vimeo.com/'+url.pathname.split('/').pop():video.src;}
+  }
+  function resizeMedia(width){
+    if(!selectedMedia?.isConnected)return;
+    const blot=Quill.find(selectedMedia);if(!blot)return;
+    quill.formatText(quill.getIndex(blot),1,'width',width||false,'user');refreshMedia();
+  }
+  mediaSelect.addEventListener('change',()=>{selectedMedia=mediaSelect.value===''?null:mediaNodes()[Number(mediaSelect.value)];refreshMedia();});
+  widthSlider.addEventListener('input',()=>resizeMedia(widthSlider.value+'%'));
+  mediaControls.querySelectorAll('[data-media-width]').forEach(button=>button.addEventListener('click',()=>resizeMedia(button.dataset.mediaWidth)));
+  quill.root.addEventListener('click',event=>{
+    const node=event.target.closest('img,video')||mediaNodes().find(item=>{if(item.tagName!=='IFRAME')return false;const rect=item.getBoundingClientRect();return event.clientX>=rect.left&&event.clientX<=rect.right&&event.clientY>=rect.top&&event.clientY<=rect.bottom;});
+    selectedMedia=node??null;refreshMedia();
+  });
   quill.root.setAttribute('aria-label','본문 화면 편집');quill.root.setAttribute('role','textbox');quill.root.setAttribute('aria-multiline','true');
   const sync=()=>{
     if(format.value==='html'&&view==='visual'&&visualDirty){body.value=articleHtml(quill.getSemanticHTML()).html;visualDirty=false;}
   };
   const count=()=>{$('#body-count').textContent=(format.value==='html'?articleHtml(body.value).text.length:body.value.length).toLocaleString()+'자';};
-  const loadVisual=()=>{const clean=articleHtml(body.value).html;quill.setContents(quill.clipboard.convert({html:clean}),'silent');visualDirty=false;};
+  const loadVisual=()=>{const clean=articleHtml(body.value).html;quill.setContents(quill.clipboard.convert({html:clean}),'silent');visualDirty=false;refreshMedia();};
   const showView=next=>{
     sync();view=next;
     if(format.value==='html'){
@@ -39,7 +82,7 @@ function setup(){
     }else{tabs.hidden=true;visualPanel.hidden=true;body.hidden=false;note.hidden=true;markdownTools.hidden=false;}
     $('#body-format-help').textContent=format.value==='html'?'이미지·동영상 삽입과 HTML 코드 편집을 지원합니다.':'## 제목 · **굵게** · - 목록';count();
   };
-  quill.on('text-change',(_delta,_old,source)=>{if(source==='silent')return;visualDirty=true;sync();count();changed();});
+  quill.on('text-change',(_delta,_old,source)=>{if(source==='silent')return;visualDirty=true;sync();count();changed();refreshMedia();});
   body.addEventListener('input',()=>{if(format.value==='html')count();});
   tabs.querySelectorAll('[data-rich-view]').forEach(button=>button.addEventListener('click',()=>{try{showView(button.dataset.richView);}catch(error){feedback(error.message);}}));
   format.addEventListener('change',()=>{
@@ -90,7 +133,7 @@ function setup(){
         kind=video.kind==='iframe'?'video':'fileVideo';value=video.src;html=articleHtml(`<${video.kind} src="${esc(video.src)}"></${video.kind}>`).html;
       }
       if(view==='code'){const start=bookmark?.index??body.value.length,end=bookmark?.end??start;body.setRangeText('\n'+html+'\n',start,end,'end');body.dispatchEvent(new Event('input',{bubbles:true}));}
-      else{const index=bookmark?.index??quill.getLength()-1;quill.insertEmbed(index,kind,value,'user');quill.insertText(index+1,'\n','user');quill.setSelection(index+2,0,'silent');}
+      else{const index=bookmark?.index??quill.getLength()-1;quill.insertEmbed(index,kind,value,'user');quill.insertText(index+1,'\n','user');quill.setSelection(index+2,0,'silent');selectedMedia=quill.getLeaf(index)[0]?.domNode;refreshMedia();}
       $('#rich-media-dialog').close();changed();count();
     }catch(error){errorNode.textContent=error.message;errorNode.hidden=false;}
   });

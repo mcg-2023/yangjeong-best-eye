@@ -26,7 +26,7 @@ npm run dev
 
 본문은 Markdown의 제목(`##`, `###`), 굵게(`**`), 목록(`-`)을 지원합니다. Markdown 모드에서 입력한 HTML은 텍스트로 표시합니다. 대표이미지는 JPG/PNG/WebP, 최대 8MB를 선택할 수 있으며 브라우저에서 최대 1600px·500KB 이하로 줄여 저장합니다. 서버에서도 파일 내용을 검사합니다.
 
-새 글은 HTML 화면 편집·코드 모드를 기본 제공합니다. 문단 서식, 링크, 본문 이미지 업로드(장당 300KB 이하로 자동 압축, 최대 4장), YouTube·Vimeo·HTTPS MP4/WebM 링크 삽입을 지원합니다. 서버가 허용한 HTML만 저장하며 JavaScript는 실행하지 않습니다. 기존 Markdown 글도 계속 편집할 수 있습니다. 본문 이미지까지 사용할 때 요청 한도는 3.5MB입니다. 자세한 내용은 `docs/admin-system.md`를 참고하세요.
+새 글은 HTML 화면 편집·코드 모드를 기본 제공합니다. 문단 서식, 링크, 본문 이미지 업로드(장당 300KB 이하로 자동 압축, 최대 4장), YouTube·Vimeo·HTTPS MP4/WebM 링크 삽입을 지원합니다. 이미지·동영상은 선택 후 너비 슬라이더(10~100%)와 25·50·75·100%·자동 버튼으로 조절하며, 저장과 재편집 후에도 크기를 유지합니다. YouTube 플레이어의 출처 정보를 유지해 구성 오류 153을 방지하며, 영상 소유자의 외부 재생 제한(101·150)은 원본 영상 열기로 안내합니다. 서버가 허용한 HTML만 저장하며 JavaScript는 실행하지 않습니다. 기존 Markdown 글도 계속 편집할 수 있습니다. 본문 이미지까지 사용할 때 요청 한도는 3.5MB입니다. 자세한 내용은 `docs/admin-system.md`를 참고하세요.
 
 ## 저장과 백업
 
@@ -94,4 +94,4 @@ npm run check
 
 - 사용방법: [Page Manager 안내](packages/page-manager/README.md)
 - 새 사이트 예제: [시작 프로젝트](examples/page-manager-starter/README.md)
-- `npm run export:manager`: `artifacts/page-manager-kit/`에 설치 가능한 tgz와 독립 실행 starter를 만듭니다. 병원 자료·게시글·환경변수 비밀 값은 포함하지 않습니다.
+- `npm run export:manager`: `artifacts/page-manager-kit-v<버전>/`에 설치 가능한 tgz와 독립 실행 starter를 만듭니다. 병원 자료·게시글·환경변수 비밀 값은 포함하지 않습니다.
