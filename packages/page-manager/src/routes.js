@@ -28,8 +28,7 @@ export function createManagerRoutes(input={},options={}){
       if(request.method==='POST'){
         if(request.headers.get('origin')!==url.origin||request.headers.get('sec-fetch-site')==='cross-site')return json({errors:['같은 사이트의 글쓰기 화면에서 다시 시도해주세요.']},403);
         if(!['/api/posts','/api/posts/status','/api/posts/delete'].includes(path))return json({errors:['지원하지 않는 요청입니다.']},404);
-        if(Number(request.headers.get('content-length')??0)>3500000)return json({errors:['요청 크기가 너무 큽니다.']},413);
-        const raw=await request.text();if(raw.length>3500000)return json({errors:['요청 크기가 너무 큽니다.']},413);
+        const raw=await request.text();
         const data=new URLSearchParams(raw);
         if(env.CSRF_TOKEN&&data.get('csrf')!==env.CSRF_TOKEN)return json({errors:['화면을 새로고침한 후 다시 시도해주세요.']},403);
         if(path==='/api/posts/delete'){
@@ -73,7 +72,7 @@ export function createManagerRoutes(input={},options={}){
       if(inlineMedia){
         const p=await repo.get(inlineMedia[1]),publicPost=p?.status==='published';
         const item=p&&(publicPost||env.ADMIN_AUTHENTICATED===true)?p.inlineImages?.find(i=>i.id===inlineMedia[2]):null;
-        const image=imageData(item?.data,300*1024);
+        const image=imageData(item?.data);
         if(!image)return new Response(null,{status:404,headers:{'X-Robots-Tag':'noindex','Cache-Control':'no-store'}});
         return new Response(Uint8Array.from(image.bytes,c=>c.charCodeAt(0)),{headers:{'Content-Type':image.mime,'Cache-Control':publicPost?'public, max-age=3600':'private, no-store','X-Content-Type-Options':'nosniff',...((!publicPost||previewHost||isTestPost(p))?{'X-Robots-Tag':'noindex'}:{})}});
       }

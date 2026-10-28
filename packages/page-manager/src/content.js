@@ -34,7 +34,7 @@ export function validatePost(post, publishing=false,options={}) {
   if(!(options.categories??['notice']).includes(post.category))errors.push('주제를 선택해주세요.');
   if(!post.body?.trim()||(post.bodyFormat==='html'&&!postText(post).trim()&&!/<(?:img|video|iframe)\b/.test(post.body)))errors.push('본문을 입력해주세요.');
   if(postText(post).length>80000||(post.body??'').length>(post.bodyFormat==='html'?200000:80000))errors.push('본문은 80,000자 이하로 입력해주세요.');
-  if(post.cover&&!validCover(post.cover))errors.push('실제 이미지 파일인 500KB 이하의 PNG, JPG, WebP를 사용해주세요.');
+  if(post.cover&&!validCover(post.cover))errors.push('실제 이미지 파일인 PNG, JPG, WebP를 사용해주세요.');
   if(post.cover&&!post.imageAlt?.trim())errors.push('대표이미지 설명을 입력해주세요.');
   if(publishing){
     if(!post.author?.trim())errors.push('작성자를 입력해주세요.');

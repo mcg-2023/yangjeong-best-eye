@@ -68,8 +68,7 @@ export function createAdminAccess({now=()=>Date.now(),audit=entry=>console.info(
     }
     if(request.method==='POST'){
       if(request.headers.get('origin')!==url.origin||request.headers.get('sec-fetch-site')==='cross-site')return {response:problem('같은 사이트의 관리 화면에서 다시 시도해주세요.',403)};
-      if(Number(request.headers.get('content-length')??0)>3500000)return {response:problem('요청 크기가 너무 큽니다.',413)};
-      const raw=await request.clone().text();if(raw.length>3500000)return {response:problem('요청 크기가 너무 큽니다.',413)};
+      const raw=await request.clone().text();
       const csrf=request.headers.get('x-csrf-token')??new URLSearchParams(raw).get('csrf');
       if(!csrf||!equal(csrf,session.n))return {response:problem('화면을 새로고침한 후 다시 시도해주세요.',403)};
     }

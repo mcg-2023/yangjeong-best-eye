@@ -24,7 +24,7 @@ export function videoSource(value){
   return null;
 }
 function imageUrl(src){
-  if(src.startsWith('data:'))return imageData(src,300*1024)?src:'';
+  if(src.startsWith('data:'))return imageData(src)?src:'';
   const url=safeArticleUrl(src);
   return url&&(url.startsWith('https://')||/^\/(?:assets\/|media\/[\w-]+\/inline\/)/.test(url))?url:'';
 }
@@ -73,7 +73,7 @@ export function articleHtml(value,{image=src=>imageUrl(src)}={}){
     if(!allowed.has(tag))return children();
     let extra='';
     if(tag==='a'){const href=safeArticleUrl(attrs.href);if(!href)return children();extra+=` href="${escape(href)}"`;if(href.startsWith('http'))extra+=' target="_blank" rel="noopener noreferrer"';}
-    const style=safeStyle(attrs.style),classes=String(attrs.class??'').split(/\s+/).filter(c=>/^ql-align-(?:center|right|justify)$/.test(c));
+    const style=safeStyle(attrs.style),classes=String(attrs.class??'').split(/\s+/).filter(c=>/^ql-align-(?:left|center|right|justify)$/.test(c));
     if(style)extra+=` style="${escape(style)}"`;if(classes.length)extra+=` class="${classes.join(' ')}"`;
     if(tag==='h2'||tag==='h3'){const id='section-'+(headings.length+1);headings.push({id,text:nodeText(node)});extra+=` id="${id}"`;}
     if(['th','td'].includes(tag))for(const name of ['colspan','rowspan'])if(/^[1-9]\d?$/.test(attrs[name]??''))extra+=` ${name}="${attrs[name]}"`;
@@ -94,19 +94,18 @@ export function articleHtml(value,{image=src=>imageUrl(src)}={}){
   return {html,text:text.replace(/\n{3,}/g,'\n\n').trim(),headings,faq};
 }
 export function prepareHtmlPost(post,existing){
-  const retained=new Map((existing?.inlineImages??[]).map(item=>[item.id,item])),images=[];let bytes=0;
+  const retained=new Map((existing?.inlineImages??[]).map(item=>[item.id,item])),images=[];
   const result=articleHtml(post.body,{image:(src,alt)=>{
     if(!alt.trim())throw new Error('본문 이미지의 설명을 입력해주세요.');
     if(src.startsWith('data:')){
-      const data=imageData(src,300*1024);if(!data)throw new Error('본문 이미지는 실제 JPG, PNG, WebP 파일이어야 하며 장당 300KB 이하여야 합니다.');
-      const item={id:crypto.randomUUID(),data:src,alt};images.push(item);bytes+=data.bytes.length;
+      const data=imageData(src);if(!data)throw new Error('본문 이미지는 실제 JPG, PNG, WebP 파일이어야 합니다.');
+      const item={id:crypto.randomUUID(),data:src,alt};images.push(item);
       return '/media/'+post.id+'/inline/'+item.id;
     }
     const match=src.match(new RegExp('^/media/'+post.id+'/inline/([\\w-]+)$'));
-    if(match){const item=retained.get(match[1]);if(!item)throw new Error('저장된 본문 이미지를 찾을 수 없습니다.');if(!images.some(i=>i.id===item.id)){images.push(item);bytes+=imageData(item.data,300*1024)?.bytes.length??300*1024;}return src;}
+    if(match){const item=retained.get(match[1]);if(!item)throw new Error('저장된 본문 이미지를 찾을 수 없습니다.');if(!images.some(i=>i.id===item.id)){images.push(item);}return src;}
     const safe=imageUrl(src);if(!safe)throw new Error('본문 이미지 주소를 확인해주세요.');return safe;
   }});
-  if(images.length>4||bytes>1200*1024)throw new Error('본문 업로드 이미지는 최대 4장까지 넣을 수 있습니다.');
   if(result.html.length>200000||result.text.length>80000)throw new Error('본문은 80,000자 이하로 입력해주세요.');
   return {...post,body:result.html,bodyText:result.text,inlineImages:images};
 }

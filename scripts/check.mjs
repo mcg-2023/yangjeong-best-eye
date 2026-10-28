@@ -31,6 +31,15 @@ try {
     assert.doesNotMatch(html,/SOURCE_EXTRACT/);
   }
   for(const path of ['/robots.txt','/sitemap.xml','/feed.xml'])assert.equal((await get(path)).status,200);
+  // Unbundled admin modules must keep their relative imports available after build.
+  const forms=await get('/page-manager/forms.js');assert.equal(forms.status,200);
+  for(const match of (await forms.text()).matchAll(/from\s+['"]([^'"]+)['"]/g)){
+    const asset=new URL(match[1],origin+'/page-manager/forms.js').pathname;
+    const response=await get(asset);assert.equal(response.status,200,asset+' imported by forms.js');
+    assert.match(response.headers.get('content-type'),/javascript/,asset+' JavaScript MIME type');
+  }
+  const imageStyle=await get('/page-manager/article-images.css');assert.equal(imageStyle.status,200);
+  assert.match(await imageStyle.text(),/ql-align-right/);
   const sitemap=await (await get('/sitemap.xml')).text();
   for(const match of sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)){
     const response=await app.fetch(new Request(match[1]),{DB:env.DB});assert.equal(response.status,200,match[1]);

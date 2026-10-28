@@ -70,7 +70,6 @@ test('inline uploads stay private in drafts, publish as separate images, and sur
     assert.equal((await save({id,status:'archived',body:post.body})).status,200);assert.equal((await get(imagePath)).status,404);
     assert.equal((await save({body:'<img src="'+data+'">'})).status,422,'image descriptions are required');
     assert.equal((await save({body:'<script>unsafe()</script>'})).status,422,'an empty sanitized body cannot be published');
-    assert.equal((await save({body:('<img src="'+data+'" alt="로고">').repeat(5)})).status,422,'upload count is bounded');
   }finally{sqlite.close();}
 });
 test('home uses the exact supplied title and description and corporate authors reference the clinic entity',async()=>{

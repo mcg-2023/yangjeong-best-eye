@@ -1,0 +1,9 @@
+/* Load after the public website stylesheet. */
+.article-shell>.article-cover,.prose .article-cover,.article-content>figure>img{display:block;width:100%;height:auto;max-height:none;object-fit:contain}
+.prose img{display:block;max-width:100%;height:auto;margin:1.5em auto}
+.prose .ql-align-left{text-align:left}
+.prose .ql-align-center{text-align:center}
+.prose .ql-align-right{text-align:right}
+.prose .ql-align-left img,.prose [style*="text-align:left"] img{margin-left:0;margin-right:auto}
+.prose .ql-align-center img,.prose [style*="text-align:center"] img{margin-left:auto;margin-right:auto}
+.prose .ql-align-right img,.prose [style*="text-align:right"] img{margin-left:auto;margin-right:0}

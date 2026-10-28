@@ -1,8 +1,10 @@
 import Quill from 'quill';
+import {readImageFile} from './image-upload.js';
 import 'quill/dist/quill.snow.css';
 import './editor.css';
 import {articleHtml,videoSource,mediaWidth} from './html-content.js';
 import {markdown,esc} from './content.js';
+import {registerImageAlignment,installImageAlignment} from './media-alignment.js';
 
 const form=document.querySelector('#post-editor');
 if(form)setup();
@@ -32,14 +34,16 @@ function setup(){
     format(name,value){if(name==='width')setWidth(this.domNode,value);else super.format(name,value);}
     html(){return this.domNode.outerHTML;}
   }
+  registerImageAlignment(Quill);
   Quill.register(DescribedImage,true);Quill.register(ResizableVideo,true);Quill.register(FileVideo,true);
   let view='visual',visualDirty=false,mediaKind='image',bookmark=null,uploadData='',uploadVersion=0,selectedMedia=null,resizeDrag=null,resizeFrame=0,observedImage=null;
   const feedback=message=>{const node=$('#editor-feedback');node.textContent=message;node.hidden=false;node.focus();};
   const changed=()=>form.dispatchEvent(new Event('input',{bubbles:true}));
-  const quill=new Quill('#rich-visual',{theme:'snow',placeholder:'본문을 작성하고 이미지나 동영상을 넣어보세요.',formats:['header','bold','italic','underline','strike','list','blockquote','link','image','video','fileVideo','align','color','code'],modules:{toolbar:{container:'#rich-toolbar',handlers:{image:()=>openMedia('image'),video:()=>openMedia('video')}}}});
+  const quill=new Quill('#rich-visual',{theme:'snow',placeholder:'본문을 작성하고 이미지나 동영상을 넣어보세요.',formats:['header','bold','italic','underline','strike','list','blockquote','link','image','video','fileVideo','align','color','code'],modules:{toolbar:{container:'#rich-toolbar',handlers:{image:()=>openMedia('image'),video:()=>openMedia('video'),align:value=>quill.format('align',value||'left','user')}}}});
   const mediaControls=document.createElement('div');mediaControls.className='rich-media-size';
   mediaControls.innerHTML='<div class="rich-media-size-heading"><label for="rich-media-select">이미지·동영상 크기</label><select id="rich-media-select" aria-label="크기를 조절할 이미지 또는 동영상"><option value="">본문에 미디어를 넣어주세요</option></select></div><div class="rich-media-size-options"><label for="rich-media-width">너비</label><input type="range" id="rich-media-width" min="10" max="100" step="1" value="100" disabled><label class="rich-media-percent"><input type="number" id="rich-media-width-value" aria-label="미디어 너비 (%)" inputmode="numeric" min="10" max="100" step="1" value="100" disabled><span>%</span></label><span id="rich-media-width-mode"></span><div class="rich-media-size-presets">'+[25,50,75,100].map(size=>`<button type="button" data-media-width="${size}%" disabled>${size}%</button>`).join('')+'<button type="button" data-media-width="" disabled>자동</button></div></div><p>이미지는 네 모서리를 드래그해 조절할 수 있습니다. 너비는 슬라이더나 % 입력으로 바꾸며 높이는 비율에 맞게 자동 조절됩니다.</p><p id="rich-media-video-note" hidden>동영상 재생은 미리보기에서 확인하세요. 외부 재생이 제한된 영상은 원본에서 볼 수 있습니다. <a id="rich-media-open" target="_blank" rel="noopener">원본 영상 열기</a></p>';
   visualPanel.append(mediaControls);
+  const imageAlignment=installImageAlignment({Quill,quill,mediaControls,selected:()=>selectedMedia,refresh:refreshMedia});
   const mediaSelect=$('#rich-media-select'),widthSlider=$('#rich-media-width'),widthValue=$('#rich-media-width-value');
   // Keep resize handles outside the editable document and saved article HTML.
   const imageResizer=document.createElement('div');imageResizer.className='rich-image-resizer';imageResizer.hidden=true;
@@ -69,6 +73,7 @@ function setup(){
     $('#rich-media-width-mode').textContent=selectedMedia&&!width?'자동':width.endsWith('px')?width:'';
     mediaControls.querySelectorAll('[data-media-width]').forEach(button=>{button.disabled=!selectedMedia;button.setAttribute('aria-pressed',String(!!selectedMedia&&button.dataset.mediaWidth===width));});
     nodes.forEach(node=>node.classList.toggle('rich-media-selected',node===selectedMedia));
+    imageAlignment.refresh();
     if(observedImage!==selectedMedia){if(observedImage)resizeObserver.unobserve(observedImage);observedImage=selectedMedia?.tagName==='IMG'?selectedMedia:null;if(observedImage)resizeObserver.observe(observedImage);}
     positionImageResizer();
     const video=selectedMedia&&selectedMedia.tagName!=='IMG'?videoSource(selectedMedia.getAttribute('src')):null;
@@ -166,18 +171,12 @@ function setup(){
   $('#rich-image-file').addEventListener('change',async event=>{
     const file=event.target.files[0],version=++uploadVersion;if(!file)return;
     const errorNode=$('#rich-media-error');errorNode.hidden=true;$('#rich-media-insert').disabled=true;form.dataset.bodyUploading='true';
-    let url;
     try{
-      if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>8*1024*1024)throw new Error('8MB 이하의 JPG, PNG, WebP 이미지를 선택해주세요.');
-      url=URL.createObjectURL(file);const image=new Image();image.src=url;await image.decode();
-      if(image.naturalWidth*image.naturalHeight>40000000)throw new Error('이미지를 4,000만 화소 이하로 줄여주세요.');
-      const scale=Math.min(1,1600/Math.max(image.naturalWidth,image.naturalHeight)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
-      let data;for(const quality of [.86,.72,.56,.4]){data=canvas.toDataURL('image/webp',quality);if(data.length<=380000)break;}
-      if(data.length>380000)throw new Error('이미지 용량을 더 줄여서 선택해주세요.');
+      const data=await readImageFile(file);
       if(version!==uploadVersion)return;
       uploadData=data;$('#rich-image-preview').src=data;$('#rich-image-preview').hidden=false;$('#rich-media-url').value='';
     }catch(error){if(version===uploadVersion){errorNode.textContent=error.message||'이미지를 읽을 수 없습니다.';errorNode.hidden=false;uploadData='';}}
-    finally{if(url)URL.revokeObjectURL(url);if(version===uploadVersion){$('#rich-media-insert').disabled=false;delete form.dataset.bodyUploading;}}
+    finally{if(version===uploadVersion){$('#rich-media-insert').disabled=false;delete form.dataset.bodyUploading;}}
   });
   $('#rich-media-insert').addEventListener('click',()=>{
     const source=uploadData||$('#rich-media-url').value.trim(),alt=$('#rich-image-alt').value.trim(),errorNode=$('#rich-media-error');

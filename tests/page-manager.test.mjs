@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createPageManager,definePageManager,repository} from '../packages/page-manager/src/index.js';
 import {createSqliteDatabase} from '../packages/page-manager/src/sqlite-database.js';
 import {readFile} from 'node:fs/promises';
+import {crc32} from 'node:zlib';
 
 const credentials={ADMIN_USERNAME:'editor',ADMIN_PASSWORD:'test-only-unique-password',SITE_INDEXING:'off'};
 const config=(id,siteName,categories)=>({id,siteName,categories,theme:{primary:'#216954',dark:'#164536',pale:'#edf8f4'}});
@@ -63,4 +64,41 @@ test('portable module preserves review gates, rejects unsafe configuration, and 
 test('the kit has no imports from the host and production schema includes the server delete privilege',async()=>{
   const source=await readFile('packages/page-manager/src/admin-views.js','utf8');assert.doesNotMatch(source,/hospital.js|\.\.\/\.\.\/src|양정|안과/);
   assert.match(await readFile('packages/page-manager/migrations/supabase.sql','utf8'),/grant select, insert, update, delete on public.posts to service_role/);
+});
+
+test('clinic.3 preserves original large images, alignment and privacy through authenticated save and publication',async()=>{
+  const DB=createSqliteDatabase(),origin='https://clinic-package.test';
+  const manager=createPageManager(config('original_images','이미지 검증',[{slug:'news',name:'소식'}]),{storage:DB,environment:()=>credentials,audit:()=>{}});
+  const png=await readFile('public/assets/favicon.png');
+  assert.equal(png.subarray(-8,-4).toString(),'IEND');
+  const original=bytes=>{
+    const payload=Buffer.concat([Buffer.from('Comment\0'),Buffer.alloc(bytes,120)]),type=Buffer.from('tEXt');
+    const length=Buffer.alloc(4),crc=Buffer.alloc(4);length.writeUInt32BE(payload.length);crc.writeUInt32BE(crc32(Buffer.concat([type,payload])));
+    return Buffer.concat([png.subarray(0,-12),length,type,payload,crc,png.subarray(-12)]);
+  };
+  const inline=original(384*1024),cover=original(640*1024);
+  const data='data:image/png;base64,'+inline.toString('base64'),coverData='data:image/png;base64,'+cover.toString('base64');
+  try{
+    const {cookie,csrf}=await signIn(manager,origin);
+    const body=Array.from({length:6},(_,i)=>`<p class="ql-align-${['left','center','right'][i%3]}"><img src="${data}" alt="원본 ${i+1}" style="width:50%"></p>`).join('');
+    const fields={csrf,title:'원본 이미지 정렬 확인',category:'news',author:'운영자',excerpt:'원본 유지 확인',bodyFormat:'html',body,cover:coverData,imageAlt:'원본 대표이미지',status:'draft'};
+    const encoded=new URLSearchParams(fields).toString();assert.ok(Buffer.byteLength(encoded)>3500000,'exercise the previous request size limit');
+    const save=extra=>manager.fetch(new Request(origin+'/api/posts',{method:'POST',headers:{origin,cookie,Accept:'application/json'},body:new URLSearchParams({...fields,...extra})}));
+    const response=await save();assert.equal(response.status,200);
+    const {id}=await response.json(),post=await repository(DB).get(id);
+    assert.equal(post.cover,coverData);assert.equal(post.inlineImages.length,6);
+    for(const image of post.inlineImages)assert.equal(image.data,data,'original bytes are not recompressed');
+    for(const alignment of ['left','center','right'])assert.ok(post.body.includes('class="ql-align-'+alignment+'"'));
+    assert.match(post.body,/style="width:50%"/);assert.doesNotMatch(post.body,/data:image/);
+    const path='/media/'+id+'/inline/'+post.inlineImages[0].id;
+    assert.equal((await manager.fetch(new Request(origin+path))).status,404);
+    const privateImage=await manager.fetch(new Request(origin+path,{headers:{cookie}}));
+    assert.equal(privateImage.status,200);assert.equal(privateImage.headers.get('cache-control'),'private, no-store');
+    assert.deepEqual(Buffer.from(await privateImage.arrayBuffer()),inline);
+    const edited=post.body.replaceAll('ql-align-right','ql-align-left');
+    assert.equal((await save({id,body:edited,status:'published'})).status,200);
+    const updated=await repository(DB).get(id);assert.equal(updated.inlineImages.length,6);assert.equal(updated.cover,coverData);assert.equal(updated.body,edited);
+    assert.deepEqual(Buffer.from(await (await manager.fetch(new Request(origin+path))).arrayBuffer()),inline);
+    assert.deepEqual(Buffer.from(await (await manager.fetch(new Request(origin+'/media/'+id+'/cover'))).arrayBuffer()),cover);
+  }finally{DB.close();}
 });
