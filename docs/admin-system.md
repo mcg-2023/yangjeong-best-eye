@@ -61,3 +61,6 @@
 ## 재사용 공통 모듈
 
 2026-10-23부터 관리자 화면·인증·게시글 API·HTML 에디터·미디어 처리는 `packages/page-manager`를 사용합니다. `src/page-manager-config.js`에 양정베스트안과의 브랜드·글 주제·의료 검수 규칙만 둡니다. 기존 src 진입점은 호환 래퍼이며 공통 모듈에 병원 정보를 복제하지 않습니다. 다른 사이트 적용 방법은 `packages/page-manager/README.md`, 시작 예제는 `examples/page-manager-starter`를 참고하세요. `npm run export:manager`로 설치용 패키지와 시작 프로젝트를 만듭니다.
+
+
+2026-10-29 `page-manager-kit-v1.2.0-clinic.5.zip`을 검토해 적용했습니다. SHA-512와 starter 설치 파일 일치를 확인했고 원본 sourceCommit은 `5b6e97d0b61ded25809ca5bd7585418e6b06da42`입니다. 원본 이미지를 512KiB 단위로 나누어 전송하고 posts 테이블의 별도 레코드에 저장하며, 공개 목록에서 해당 레코드를 제외합니다. 본문에서 제거한 이미지는 관리자 재편집을 위해 보존하되 방문자에게 제공하지 않습니다. 새 모듈 image-transfer.js의 빌드 복사, 이미지 스타일 연결, 동시 업로드의 글 ID 공유를 보완했습니다. 추가 SQL이나 환경변수는 필요하지 않습니다.

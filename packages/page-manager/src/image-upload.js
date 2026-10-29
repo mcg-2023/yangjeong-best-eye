@@ -1,3 +1,4 @@
+import {storeImageData} from './image-transfer.js';
 // Keep original image bytes; validate the file type and browser decoding only.
 export async function readImageFile(file) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
@@ -18,4 +19,8 @@ export async function readImageFile(file) {
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+export async function storeImageFile(file, options) {
+  return storeImageData(await readImageFile(file), options);
 }

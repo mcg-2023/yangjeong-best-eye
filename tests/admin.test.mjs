@@ -115,7 +115,7 @@ test('confirmed deletion removes only the selected post and its media; public pa
     for(const path of ['/','/health/','/health/category/notice/','/clinic/','/location/'])assert.doesNotMatch(await (await page(path)).text(),/href="\/admin\//,path+' has no admin links, including empty collections');
     const image='data:image/png;base64,'+(await readFile('public/assets/favicon.png')).toString('base64');
     for(const id of ['delete-fixture','keep-fixture']){
-      const p={id,title:id,category:'notice',author:'운영자',body:'## 안내\n본문',status:'published',excerpt:'요약',updatedAt:'2026-10-22T00:00:00Z',publishedAt:'2026-10-22T00:00:00Z',cover:image,imageAlt:'병원 로고',inlineImages:[{id:'inline-fixture',data:image,alt:'병원 로고'}]};
+      const p={id,title:id,category:'notice',author:'운영자',bodyFormat:'html',body:'<p>안내 본문</p><img src="/media/'+id+'/inline/inline-fixture" alt="병원 로고">',status:'published',excerpt:'요약',updatedAt:'2026-10-22T00:00:00Z',publishedAt:'2026-10-22T00:00:00Z',cover:image,imageAlt:'병원 로고',inlineImages:[{id:'inline-fixture',data:image,alt:'병원 로고'}]};
       db.prepare('INSERT INTO posts VALUES (?,?,?,?)').run(id,JSON.stringify(p),p.status,p.updatedAt);
     }
     assert.equal((await page('/api/posts/delete')).status,405);

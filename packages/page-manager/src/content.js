@@ -21,7 +21,7 @@ export function markdown(text) {
 }
 export const headings = body => Array.from(String(body??'').matchAll(/^#{2,3} (.+)$/gm),(m,i)=>({id:`section-${i+1}`,text:m[1]}));
 export const isTestPost = post => post.id?.startsWith('test-journal-') === true;
-export const coverUrl = post => post.cover ? `/media/${encodeURIComponent(post.id)}/cover?v=${encodeURIComponent(post.updatedAt??post.publishedAt??'1')}` : '';
+export const coverUrl = post => post.coverRef || (post.cover ? `/media/${encodeURIComponent(post.id)}/cover?v=${encodeURIComponent(post.updatedAt??post.publishedAt??'1')}` : '');
 export const latestPosts = posts => posts.filter(p=>p.status==='published').sort((a,b)=>(b.publishedAt??b.createdAt??'').localeCompare(a.publishedAt??a.createdAt??'')||a.id.localeCompare(b.id));
 export const validCover=value=>Boolean(imageData(value));
 export const postText=post=>post.bodyFormat==='html'?articleHtml(post.body).text:String(post.body??'');
@@ -35,7 +35,7 @@ export function validatePost(post, publishing=false,options={}) {
   if(!post.body?.trim()||(post.bodyFormat==='html'&&!postText(post).trim()&&!/<(?:img|video|iframe)\b/.test(post.body)))errors.push('본문을 입력해주세요.');
   if(postText(post).length>80000||(post.body??'').length>(post.bodyFormat==='html'?200000:80000))errors.push('본문은 80,000자 이하로 입력해주세요.');
   if(post.cover&&!validCover(post.cover))errors.push('실제 이미지 파일인 PNG, JPG, WebP를 사용해주세요.');
-  if(post.cover&&!post.imageAlt?.trim())errors.push('대표이미지 설명을 입력해주세요.');
+  if((post.cover||post.coverRef)&&!post.imageAlt?.trim())errors.push('대표이미지 설명을 입력해주세요.');
   if(publishing){
     if(!post.author?.trim())errors.push('작성자를 입력해주세요.');
     if(!post.excerpt?.trim())errors.push('글 요약을 입력해주세요.');

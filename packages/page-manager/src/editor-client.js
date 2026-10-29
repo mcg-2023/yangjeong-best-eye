@@ -1,5 +1,5 @@
 import Quill from 'quill';
-import {readImageFile} from './image-upload.js';
+import {storeImageFile} from './image-upload.js';
 import 'quill/dist/quill.snow.css';
 import './editor.css';
 import {articleHtml,videoSource,mediaWidth} from './html-content.js';
@@ -172,7 +172,7 @@ function setup(){
     const file=event.target.files[0],version=++uploadVersion;if(!file)return;
     const errorNode=$('#rich-media-error');errorNode.hidden=true;$('#rich-media-insert').disabled=true;form.dataset.bodyUploading='true';
     try{
-      const data=await readImageFile(file);
+      const data=await storeImageFile(file,{form,kind:'inline'});
       if(version!==uploadVersion)return;
       uploadData=data;$('#rich-image-preview').src=data;$('#rich-image-preview').hidden=false;$('#rich-media-url').value='';
     }catch(error){if(version===uploadVersion){errorNode.textContent=error.message||'이미지를 읽을 수 없습니다.';errorNode.hidden=false;uploadData='';}}

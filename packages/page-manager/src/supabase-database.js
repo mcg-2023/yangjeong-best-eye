@@ -19,7 +19,7 @@ export function createSupabaseDatabase({url,secretKey,fetchImpl=fetch}={}) {
     async list(){
       const items=[],limit=100;
       for(let offset=0;;offset+=limit){
-        const rows=await (await query({select:'data',order:'updated_at.desc,id.asc',limit,offset})).json();
+        const rows=await (await query({select:'data','data->>recordType':'is.null',order:'updated_at.desc,id.asc',limit,offset})).json();
         items.push(...rows.map(post));
         if(rows.length<limit)return items;
       }

@@ -1,7 +1,7 @@
 import {esc,validatePost,publicationData,postBody} from './content.js';
 import {repository} from './repository.js';
-import {prepareHtmlPost} from './html-content.js';
 import {imageData} from './image-data.js';
+import {receiveImage,prepareStoredPost,storedImage,imageResponse} from './image-storage.js';
 import {createAdminViews} from './admin-views.js';
 import {definePageManager,validationOptions} from './config.js';
 import {icon} from './ui.js';
@@ -27,10 +27,11 @@ export function createManagerRoutes(input={},options={}){
   const notFound=()=>desk('페이지를 찾을 수 없습니다','<div class="desk-empty"><h1>페이지를 찾을 수 없습니다.</h1><p>주소가 올바른지 확인해주세요.</p><a class="btn primary" href="/admin/">대시보드로 이동</a></div>',{status:404});
       if(request.method==='POST'){
         if(request.headers.get('origin')!==url.origin||request.headers.get('sec-fetch-site')==='cross-site')return json({errors:['같은 사이트의 글쓰기 화면에서 다시 시도해주세요.']},403);
-        if(!['/api/posts','/api/posts/status','/api/posts/delete'].includes(path))return json({errors:['지원하지 않는 요청입니다.']},404);
+        if(!['/api/posts','/api/posts/status','/api/posts/delete','/api/posts/images'].includes(path))return json({errors:['지원하지 않는 요청입니다.']},404);
         const raw=await request.text();
         const data=new URLSearchParams(raw);
         if(env.CSRF_TOKEN&&data.get('csrf')!==env.CSRF_TOKEN)return json({errors:['화면을 새로고침한 후 다시 시도해주세요.']},403);
+        if(path==='/api/posts/images'){const result=await receiveImage(env.DB,data);const {status,...body}=result;return json(body,status);}
         if(path==='/api/posts/delete'){
           const id=data.get('id')??'';
           if(!/^[\w-]+$/.test(id))return json({errors:['글을 찾을 수 없습니다.']},404);
@@ -56,7 +57,7 @@ export function createManagerRoutes(input={},options={}){
         for(const [field,key] of [['faqText','faq'],['sourcesText','sources'],['tags','tags']])if(!data.has(field))input[key]=old?.[key]??[];
         if(!['draft','medical_review','published','archived'].includes(input.status))return json({errors:['올바른 저장 상태를 선택해주세요.']},400);
         let p=publicationData(input,old);
-        if(p.bodyFormat==='html')try{p=prepareHtmlPost(p,old);}catch(error){return json({errors:[error.message]},422);}
+        try{p=await prepareStoredPost(env.DB,p,old);}catch(error){return json({errors:[error.message]},422);}
         const errors=validatePost(p,p.status==='published',validationOptions(config));
         if(errors.length)return json({errors},422);
         const all=await repo.list();if(p.status==='published'&&all.some(x=>x.id!==p.id&&x.status==='published'&&x.title.replace(/\s/g,'')===p.title.replace(/\s/g,'')))return json({errors:['동일한 제목의 발행 글이 있습니다. 기존 글을 수정해주세요.']},422);
@@ -71,17 +72,18 @@ export function createManagerRoutes(input={},options={}){
       const inlineMedia=path.match(/^\/media\/([\w-]+)\/inline\/([\w-]+)$/);
       if(inlineMedia){
         const p=await repo.get(inlineMedia[1]),publicPost=p?.status==='published';
-        const item=p&&(publicPost||env.ADMIN_AUTHENTICATED===true)?p.inlineImages?.find(i=>i.id===inlineMedia[2]):null;
+        const used=p&&(p.body?.includes('src="'+path+'"')||p.coverRef===path);
+        const item=p&&((publicPost&&used)||env.ADMIN_AUTHENTICATED===true)?p.inlineImages?.find(i=>i.id===inlineMedia[2])??await storedImage(env.DB,inlineMedia[1],inlineMedia[2]):null;
         const image=imageData(item?.data);
         if(!image)return new Response(null,{status:404,headers:{'X-Robots-Tag':'noindex','Cache-Control':'no-store'}});
-        return new Response(Uint8Array.from(image.bytes,c=>c.charCodeAt(0)),{headers:{'Content-Type':image.mime,'Cache-Control':publicPost?'public, max-age=3600':'private, no-store','X-Content-Type-Options':'nosniff',...((!publicPost||previewHost||isTestPost(p))?{'X-Robots-Tag':'noindex'}:{})}});
+        return imageResponse(image,{'Cache-Control':publicPost&&used?'public, max-age=3600':'private, no-store','X-Content-Type-Options':'nosniff',...((!publicPost||previewHost||isTestPost(p))?{'X-Robots-Tag':'noindex'}:{})});
       }
       const media=path.match(/^\/media\/([\w-]+)\/cover$/);
       if(media){
         const p=await repo.get(media[1]);
-        const image=p?.status==='published'&&p.cover?.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
+        const image=p&&(p.status==='published'||env.ADMIN_AUTHENTICATED===true)&&p.cover?.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
         if(!image)return new Response(null,{status:404,headers:{'X-Robots-Tag':'noindex','Cache-Control':'no-store'}});
-        return new Response(Uint8Array.from(atob(image[2]),c=>c.charCodeAt(0)),{headers:{'Content-Type':image[1],'Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff',...((previewHost||isTestPost(p))?{'X-Robots-Tag':'noindex'}:{})}});
+        return imageResponse(imageData(p.cover),{'Cache-Control':p.status==='published'?'public, max-age=3600':'private, no-store','X-Content-Type-Options':'nosniff',...((p.status!=='published'||previewHost||isTestPost(p))?{'X-Robots-Tag':'noindex'}:{})});
       }
 
   const posts=await repo.list();

@@ -1,4 +1,4 @@
-# Page Manager 1.2.0-clinic.3
+# Page Manager 1.2.0-clinic.5
 
 한국어 홈페이지에 붙여 쓰는 관리자·게시글 에디터 공통 모듈입니다. Node.js 24의 Fetch Request/Response를 사용합니다. 현재 양정베스트안과도 같은 소스를 사용합니다. PHP·워드프레스용 플러그인은 아닙니다.
 
@@ -19,7 +19,7 @@
 
 ## 새 사이트에서 빠르게 시작
 
-함께 제공한 `starter`를 사용하면 됩니다. 설치 가능한 `mcg-page-manager-1.2.0-clinic.3.tgz`와 starter를 같은 압축파일에 포함했습니다.
+함께 제공한 `starter`를 사용하면 됩니다. 설치 가능한 `mcg-page-manager-1.2.0-clinic.5.tgz`와 starter를 같은 압축파일에 포함했습니다.
 
 1. `starter` 폴더에서 `npm install`을 실행합니다.
 2. `npm run build`로 공통 자산을 복사합니다.
@@ -38,7 +38,7 @@
 
 ## 다른 홈페이지에 연결
 
-`npm install ./mcg-page-manager-1.2.0-clinic.3.tgz`로 설치한 뒤 서버의 요청 처리기에 연결합니다.
+`npm install ./mcg-page-manager-1.2.0-clinic.5.tgz`로 설치한 뒤 서버의 요청 처리기에 연결합니다.
 
 ```js
 import {createPageManager} from '@mcg/page-manager';
@@ -112,6 +112,6 @@ starter의 Vercel 프로젝트는 `starter`를 Root Directory로 선택합니다
 
 공통 기능은 이 패키지에서 수정하고 각 사이트에는 버전을 올려 설치합니다. 사이트별 설정 파일과 DB는 유지하세요. 소스 작업 시 `npm install`과 `npm run build`로 자산을 다시 만듭니다. 배포용 tgz에는 자산이 이미 빌드되어 있어 설치한 사이트가 Quill/Vite를 별도로 빌드할 필요가 없습니다. 외부 npm 레지스트리에는 자동 게시하지 않습니다.
 
-## 1.2.0-clinic.3 통합
+## 1.2.0-clinic.5 통합
 
-이미지·문단 정렬과 원본 이미지 업로드를 포함합니다. 공개 사이트에서도 `/page-manager/article-images.css`를 기존 사이트 스타일 뒤에 로드하세요. 빌드 도구는 이 스타일과 원본 업로드 모듈 `image-upload.js`를 함께 복사합니다. Vercel의 요청·응답 전송 한도는 앱의 제한 해제와 별개이며, 큰 원본을 포함한 저장 요청은 플랫폼 한도에 걸릴 수 있습니다.
+이미지·문단 정렬과 원본 이미지 업로드를 포함합니다. 공개 사이트에서도 `/page-manager/article-images.css`를 기존 사이트 스타일 뒤에 로드하세요. 빌드 도구는 이 스타일과 원본 업로드 모듈 `image-upload.js`를 함께 복사합니다. 이미지는 512KiB 단위로 나누어 전송하고 기존 posts 테이블의 별도 이미지 레코드로 보존합니다. 글 저장은 이미지 주소만 전송하며, 이미지 응답은 스트림을 사용합니다. 기존 글에 포함된 원본 이미지도 계속 읽고 편집할 수 있습니다. 전송·저장소의 서비스 한도는 계속 적용됩니다.

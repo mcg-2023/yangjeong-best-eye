@@ -46,6 +46,11 @@ body.rich-media-resizing,body.rich-media-resizing *{user-select:none!important}
 .ql-snow .ql-tooltip{z-index:5;white-space:normal;font-size:16px;max-width:calc(100vw - 80px)}
 @media(max-width:760px){.rich-view-tabs .rich-media-buttons{margin-left:0}.rich-body-card .ql-editor{padding:18px;min-height:360px}.rich-body-card .ql-toolbar.ql-snow{padding:10px 8px}.rich-media-fields{padding:23px}.body-format-label{gap:6px}}
 
+.rich-body-card .ql-snow .ql-picker.ql-icon-picker{width:29px;min-width:0;height:29px}
+.rich-body-card .ql-snow .ql-icon-picker .ql-picker-label{display:flex;align-items:center;justify-content:center;padding:4px}
+.rich-body-card .ql-snow .ql-icon-picker .ql-picker-label>svg{position:static;width:21px;height:21px;max-width:none;margin:0}
+.rich-body-card .ql-snow .ql-icon-picker .ql-picker-item{display:flex;align-items:center;justify-content:center;width:29px;height:29px;padding:4px}
+.rich-body-card .ql-snow .ql-icon-picker .ql-picker-item>svg{width:21px;height:21px;max-width:none}
 .rich-media-align{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:14px}
 .rich-media-align>span{margin-right:6px;font-weight:600}
 .rich-media-align button{font:inherit;min-height:40px;padding:7px 14px;border:1px solid #dbe3f0;border-radius:4px;background:#fff;color:#415578}

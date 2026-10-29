@@ -93,8 +93,8 @@ export function articleHtml(value,{image=src=>imageUrl(src)}={}){
   collect(parseFragment(html));
   return {html,text:text.replace(/\n{3,}/g,'\n\n').trim(),headings,faq};
 }
-export function prepareHtmlPost(post,existing){
-  const retained=new Map((existing?.inlineImages??[]).map(item=>[item.id,item])),images=[];
+export function prepareHtmlPost(post,existing,{storedImages=new Set()}={}){
+  const retained=new Map((existing?.inlineImages??[]).map(item=>[item.id,item])),images=[...(existing?.inlineImages??[])];
   const result=articleHtml(post.body,{image:(src,alt)=>{
     if(!alt.trim())throw new Error('본문 이미지의 설명을 입력해주세요.');
     if(src.startsWith('data:')){
@@ -103,7 +103,7 @@ export function prepareHtmlPost(post,existing){
       return '/media/'+post.id+'/inline/'+item.id;
     }
     const match=src.match(new RegExp('^/media/'+post.id+'/inline/([\\w-]+)$'));
-    if(match){const item=retained.get(match[1]);if(!item)throw new Error('저장된 본문 이미지를 찾을 수 없습니다.');if(!images.some(i=>i.id===item.id)){images.push(item);}return src;}
+    if(match){const item=retained.get(match[1]);if(!item){if(storedImages.has(match[1]))return src;throw new Error('저장된 본문 이미지를 찾을 수 없습니다. ('+alt+') 이미지를 다시 선택해주세요.');}if(!images.some(i=>i.id===item.id)){images.push(item);}return src;}
     const safe=imageUrl(src);if(!safe)throw new Error('본문 이미지 주소를 확인해주세요.');return safe;
   }});
   if(result.html.length>200000||result.text.length>80000)throw new Error('본문은 80,000자 이하로 입력해주세요.');
