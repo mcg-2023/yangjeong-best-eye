@@ -28,7 +28,7 @@ Supabase 연결은 서버에서만 사용합니다. `posts` 테이블은 RLS를 
 | `ADMIN_USERNAME` | 관리자 아이디. 기본값 admin |
 | `ADMIN_PASSWORD` | 길고 추측하기 어려운 관리자 비밀번호. 설정 전에는 관리자 기능이 열리지 않습니다. |
 | `SITE_URL` | `https://yangjeong-best-eye.vercel.app`처럼 최종 홈페이지 주소만 입력. 경로·쿼리 제외 |
-| `SITE_INDEXING` | 검증 중 off. 공개 운영과 최종 주소 확인 후 on |
+| `SITE_INDEXING` | 공개 운영 on. vercel.json에 on을 선언했습니다. 검증용 호스트·관리자·검색 결과·초안·TEST 글은 계속 검색에서 제외합니다. |
 | `GOOGLE_SITE_VERIFICATION` / `NAVER_SITE_VERIFICATION` | 검색 서비스 소유권 인증 값. 필요한 경우에만 사용 |
 
 비밀번호와 서버 키는 Vercel의 비공개 환경변수에만 입력합니다. `/admin/`에 접속하면 전용 로그인 화면이 나타나며 기존 `ADMIN_USERNAME`·`ADMIN_PASSWORD`로 로그인합니다. HTTPS 전용 HttpOnly 세션 쿠키와 CSRF 토큰을 사용합니다. 외부에서 보낸 기존 플랫폼 인증 헤더는 신뢰하지 않습니다. 미설정 상태에서 메모리나 임시 파일로 저장한 것처럼 응답하지 않고 503을 반환합니다. 자세한 구조와 운영 범위는 [관리자 시스템](admin-system.md)을 참고하세요.

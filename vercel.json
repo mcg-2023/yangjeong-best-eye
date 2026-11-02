@@ -3,5 +3,6 @@
   "framework": null,
   "buildCommand": "npm run build:vercel",
   "outputDirectory": "dist/vercel",
+  "env": {"SITE_INDEXING": "on"},
   "rewrites": [{"source": "/(.*)", "destination": "/api/index"}]
 }

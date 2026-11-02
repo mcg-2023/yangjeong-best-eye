@@ -1,10 +1,36 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {createVercelHandler} from '../src/vercel-runtime.js';
 import {createSupabaseDatabase} from '../src/supabase-database.js';
 import {login} from './admin-helper.mjs';
 
 const origin='https://clinic.vercel.app';
+test('deployment enables public search indexing while previews and nonpublic pages remain excluded',async()=>{
+  const configuration=JSON.parse(await readFile('vercel.json','utf8'));
+  assert.equal(configuration.env.SITE_INDEXING,'on');
+  const production='https://yangjeong-best-eye.vercel.app';
+  const post={id:'indexing-fixture',title:'공개 공지 확인',category:'notice',status:'published',body:'공개 안내',author:'운영자',excerpt:'공개 요약',publishedAt:'2026-11-02T01:00:00Z',updatedAt:'2026-11-02T01:00:00Z'};
+  const rows=[post,{...post,id:'private-fixture',status:'draft'},{...post,id:'test-journal-fixture'}].map(data=>({data}));
+  const handler=createVercelHandler({environment:()=>({...configuration.env,SITE_URL:production,SUPABASE_URL:'https://test.supabase.co',SUPABASE_SECRET_KEY:'sb_secret_test_only',ADMIN_PASSWORD:'test-only-password'}),fetchImpl:async()=>Response.json(rows)});
+  for(const path of ['/','/clinic/','/location/','/health/','/health/indexing-fixture/']){
+    const response=await handler(new Request(production+path));
+    assert.equal(response.status,200,path);
+    assert.equal(response.headers.get('x-robots-tag'),null,path);
+    assert.match(await response.text(),/<meta name="robots" content="index,follow,max-image-preview:large">/);
+    const preview=await handler(new Request('https://private-preview.vercel.app'+path));
+    assert.equal(preview.headers.get('x-robots-tag'),'noindex, follow');
+  }
+  for(const path of ['/health/?q=안내','/privacy/','/health/test-journal-fixture/']){
+    const response=await handler(new Request(production+path));
+    assert.equal(response.headers.get('x-robots-tag'),'noindex, follow');
+  }
+  assert.equal((await handler(new Request(production+'/health/private-fixture/'))).status,404);
+  const admin=await handler(new Request(production+'/admin/'));
+  assert.equal(admin.status,303);assert.match(admin.headers.get('x-robots-tag'),/noindex/);
+  const sitemap=await (await handler(new Request(production+'/sitemap.xml'))).text();
+  assert.match(sitemap,/indexing-fixture/);assert.doesNotMatch(sitemap,/private-fixture|test-journal|\/admin\//);
+});
 test('Vercel accepts pasted domains and recovers invalid SITE_URL without preview canonicals',async t=>{
   const warning=t.mock.method(console,'warn',()=>{});
   const base={SUPABASE_URL:'https://test.supabase.co',SUPABASE_SECRET_KEY:'sb_secret_test_only',SITE_INDEXING:'on'};
