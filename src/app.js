@@ -29,7 +29,7 @@ export function createApp(assets={}) {
       if(/^\/(?:health|clinic|location|privacy|editorial-policy|admin|admin\/(?:new|posts|settings)|health\/category\/[\w-]+|health\/[\w-]+|admin\/(?:edit|preview)\/[\w-]+)$/.test(path))return new Response(null,{status:308,headers:{Location:path+'/'+url.search}});
       const posts=await repo.list(),published=latestPosts(posts),indexable=published.filter(p=>!isTestPost(p));
       const labels={'/health/':'건강정보','/clinic/':'병원안내','/location/':'오시는 길','/privacy/':'개인정보 안내','/editorial-policy/':'콘텐츠 운영원칙'};
-      const frame=(title,description,body,options={})=>v.layout({title,description,body,path,origin,breadcrumbs:labels[path]?[{name:'홈',url:'/'},{name:labels[path],url:path}]:[],verification:{'google-site-verification':env.GOOGLE_SITE_VERIFICATION,'naver-site-verification':env.NAVER_SITE_VERIFICATION},...options,noindex:previewHost||options.noindex===true});
+      const frame=(title,description,body,options={})=>v.layout({title,description,body,path,origin,breadcrumbs:labels[path]?[{name:'홈',url:'/'},{name:labels[path],url:path}]:[],verification:{'google-site-verification':env.GOOGLE_SITE_VERIFICATION||'jJnQmeitzjz5U3cZ1mcqthogzkjpNyMaNfqP1TQL1TE','naver-site-verification':env.NAVER_SITE_VERIFICATION||'7cfc9368cfa3ca22db9276b4cc551c5ad65a16a8'},...options,noindex:previewHost||options.noindex===true});
       const desk=(title,body,options={})=>admin.adminLayout({title,body,path,csrf:env.CSRF_TOKEN??'',username:env.ADMIN_USERNAME||'관리자',local:env.LOCAL_PREVIEW===true,...options});
       function collectionOptions(category){
         const query=url.searchParams.get('q')??'',page=Number(url.searchParams.get('page')??1);
