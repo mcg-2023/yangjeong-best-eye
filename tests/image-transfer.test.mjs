@@ -63,7 +63,8 @@ test('clinic.5 transfers large originals in small requests through the Vercel/Su
   const reopened=createVercelHandler({environment:()=>env,fetchImpl});
   const page=await reopened(new Request(origin+'/health/'+id+'/'));assert.equal(page.status,200);
   const html=await page.text();assert.ok(html.includes(cover));assert.match(html,/ql-align-right/);assert.match(html,/width:57%/);
-  assert.ok(html.includes('<figure><img src="'+cover+'"'),'the article renders a reference-backed cover outside metadata');
+  assert.ok(!html.includes('<figure><img src="'+cover+'"'),'a thumbnail reference does not insert an extra cover above the authored body');
+  assert.ok(html.includes('<img src="'+src+'"'),'the authored body image remains visible');
   for(const path of ['/','/health/','/health/category/notice/']){
     const listing=await (await reopened(new Request(origin+path))).text();
     assert.ok(listing.includes('<img class="post-cover" src="'+cover+'"'),path+' renders the reference-backed thumbnail');
