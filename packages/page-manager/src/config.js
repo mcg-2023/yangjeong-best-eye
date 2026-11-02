@@ -22,6 +22,7 @@ export function definePageManager(input={}){
   return Object.freeze({[normalized]:true,id,siteName:text(input.siteName,'홈페이지'),storageName:text(input.storageName,'게시글 저장소'),logo:asset(input.logo,'/page-manager/brand.svg'),favicon:asset(input.favicon,'/page-manager/brand.svg'),font:asset(input.font,'/page-manager/PretendardVariable.woff2'),policyUrl:asset(input.policyUrl,'/'),publicPostBase,
     eyebrow:text(input.eyebrow,'WEBSITE · CONTENT DESK'),copyright:text(input.copyright,'WEBSITE MANAGER'),monogram:text(input.monogram,'PM'),welcomeTitle:text(input.welcomeTitle,'홈페이지의 새로운 이야기, 이곳에서 시작합니다.'),categories:Object.freeze(categories),
     review:Object.freeze({enabled:reviewEnabled,label:text(input.review?.label,'콘텐츠 검수'),approvalText:text(input.review?.approvalText,'검수자가 본문의 내용을 실제 확인하고 승인했습니다.'),help:text(input.review?.help,'검수가 필요한 주제는 발행할 때마다 검수자·검수일과 검수 완료를 확인해주세요.')}),
+    analytics:Object.freeze({enabled:input.analytics?.enabled!==false,trustProxy:input.analytics?.trustProxy===true}),
     theme:Object.freeze({primary:color(input.theme?.primary,'#213d78'),dark:color(input.theme?.dark,'#172e5c'),pale:color(input.theme?.pale,'#edf1f8')})});
 }
 export const validationOptions=config=>({categories:config.categories.map(c=>c.slug),reviewCategories:config.categories.filter(c=>c.reviewRequired).map(c=>c.slug),reviewLabel:config.review.label});

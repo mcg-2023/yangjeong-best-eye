@@ -48,7 +48,7 @@ npm run check
 
 `dist/server/index.js`는 서버 렌더링 앱과 최적화 이미지, CSS/JS가 포함된 독립 ESM Worker입니다. 검색엔진은 JavaScript 없이 본문·링크를 읽을 수 있습니다. 제목·설명·canonical·OG·JSON-LD·사이트맵·RSS를 서버에서 생성하며, 임시글·관리자·검색 결과·빈 주제는 검색에서 제외합니다. 새 글 발행은 재빌드 없이 목록·주제·관련글·사이트맵·RSS에 반영됩니다.
 
-발행 글이 없는 초기 RSS는 빈 채널입니다. 첫 글 발행 후 RSS 항목이 생깁니다. GA4·Google Search Console·Naver Search Advisor는 계정 및 검증 코드가 없어 연결하지 않았습니다. 검색 순위나 AI 검색 인용을 보장하지 않습니다.
+발행 글이 없는 초기 RSS는 빈 채널입니다. 첫 글 발행 후 RSS 항목이 생깁니다. 네이버·구글 소유확인 메타태그는 적용했습니다. 검색 서비스의 계정 내 소유확인·사이트맵 제출은 별도 절차이며 GA4는 연결하지 않았습니다. clinic.6의 자체 방문통계는 공개 페이지 추적 스크립트와 Supabase 전용 통계 테이블을 사용합니다. 검색 순위나 AI 검색 인용을 보장하지 않습니다.
 
 ## 주요 파일
 
@@ -95,3 +95,7 @@ npm run check
 - 사용방법: [Page Manager 안내](packages/page-manager/README.md)
 - 새 사이트 예제: [시작 프로젝트](examples/page-manager-starter/README.md)
 - `npm run export:manager`: `artifacts/page-manager-kit-v<버전>/`에 설치 가능한 tgz와 독립 실행 starter를 만듭니다. 병원 자료·게시글·환경변수 비밀 값은 포함하지 않습니다.
+
+## 관리자 패키지 clinic.6 (2026-11-02)
+
+`@mcg/page-manager`를 1.2.0-clinic.6으로 업데이트했습니다. `/admin/statistics/`에서 방문통계, `/admin/sites/`에서 수집 도메인·활성 상태를 관리합니다. 공개 페이지에는 사이트 ID `yjbest`의 추적 스크립트를 연결했습니다. 기존 게시글·이미지 데이터 구조와 사이트 설정은 유지합니다. Supabase 추가 마이그레이션은 `supabase/migrations/202611020001_analytics.sql`, 로컬 미리보기용은 `drizzle/0001_analytics.sql`입니다. 업데이트 및 검증 기록은 [clinic.6 적용 기록](docs/page-manager-clinic-6-update.md)을 참고하세요.

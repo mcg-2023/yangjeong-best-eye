@@ -25,7 +25,8 @@ export function createVercelHandler({environment=()=>process.env,fetchImpl=fetch
   return async request=>{
     const env=environment();
     const denied=(text,status,extra={})=>new Response(text,{status,headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store','X-Robots-Tag':'noindex',...extra}});
-    const access=await adminAccess(request,env);
+    const publicTrack=new URL(request.url).pathname==='/api/public/track';
+    const access=publicTrack?{context:{}}:await adminAccess(request,env);
     if(access.response)return request.method==='HEAD'?new Response(null,{status:access.response.status,headers:access.response.headers}):access.response;
     let database;
     try{database=createSupabaseDatabase({url:env.SUPABASE_URL,secretKey:env.SUPABASE_SECRET_KEY||env.SUPABASE_SERVICE_ROLE_KEY,fetchImpl});}
@@ -38,7 +39,7 @@ export function createVercelHandler({environment=()=>process.env,fetchImpl=fetch
     }
     const origin=configured||configuredOrigin(env.VERCEL_PROJECT_PRODUCTION_URL)||productionOrigin;
     const response=await app.fetch(request,{
-      DB:database,VERCEL_RUNTIME:true,...access.context,
+      DB:database,VERCEL_RUNTIME:true,VERCEL:env.VERCEL,...access.context,
       SITE_URL:origin,SITE_INDEXING:env.SITE_INDEXING||'off',
       GOOGLE_SITE_VERIFICATION:env.GOOGLE_SITE_VERIFICATION,NAVER_SITE_VERIFICATION:env.NAVER_SITE_VERIFICATION,
     });

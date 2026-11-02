@@ -1,3 +1,4 @@
+import {supabaseAnalytics} from './analytics-supabase.js';
 // Server only: the secret key must never be included in browser code or HTML.
 export function createSupabaseDatabase({url,secretKey,fetchImpl=fetch}={}) {
   if(!url&&!secretKey)return null;
@@ -15,7 +16,7 @@ export function createSupabaseDatabase({url,secretKey,fetchImpl=fetch}={}) {
     return response;
   }
   const post=row=>typeof row.data==='string'?JSON.parse(row.data):row.data;
-  return {posts:{
+  return {analytics:supabaseAnalytics(base,headers,fetchImpl),posts:{
     async list(){
       const items=[],limit=100;
       for(let offset=0;;offset+=limit){

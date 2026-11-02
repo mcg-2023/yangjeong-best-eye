@@ -1,3 +1,9 @@
+# 1.2.0-clinic.6 (2026-11-02)
+
+- Vercel/Supabase visitor analytics, dedicated RLS tables and atomic ingestion RPC
+- Authorized statistics/site management, event drilldown, session timeline and tracker
+- Preserve clinic.5 rich text and original image storage behavior
+
 # 변경 기록
 
 ## 1.2.0-clinic.5 — 2026-10-29

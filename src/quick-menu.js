@@ -25,7 +25,7 @@ export function quickMenu(){
         const className=`quick-menu-item quick-menu-${item.key}`;
         if(!item.href)return `<button type="button" class="${className}" data-quick-pending="${item.label}" title="${item.label} 연결 주소 확인 중">${content}<span class="sr-only">연결 준비 중</span></button>`;
         const external=/^https?:/.test(item.href),phone=item.href.startsWith('tel:');
-        return `<a class="${className}" href="${esc(item.href)}" ${external?'target="_blank" rel="noopener noreferrer"':''} ${phone?'title="전화로 진료예약 문의"':''}>${content}${external?'<span class="sr-only">새 창으로 열기</span>':''}</a>`;
+        return `<a class="${className}" href="${esc(item.href)}" data-track-event="${esc(item.label)}" ${external?'target="_blank" rel="noopener noreferrer"':''} ${phone?'title="전화로 진료예약 문의"':''}>${content}${external?'<span class="sr-only">새 창으로 열기</span>':''}</a>`;
       }).join('')}
     </div>
     <button class="quick-menu-toggle" type="button" aria-controls="quick-menu-links" aria-expanded="false" hidden>${glyph('toggle')}<span>바로가기</span></button>

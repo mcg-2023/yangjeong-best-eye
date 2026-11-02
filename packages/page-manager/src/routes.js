@@ -1,5 +1,6 @@
 import {esc,validatePost,publicationData,postBody} from './content.js';
 import {repository} from './repository.js';
+import {prepareHtmlPost} from './html-content.js';
 import {imageData} from './image-data.js';
 import {receiveImage,prepareStoredPost,storedImage,imageResponse} from './image-storage.js';
 import {createAdminViews} from './admin-views.js';
@@ -10,7 +11,7 @@ const redirect=path=>new Response(null,{status:303,headers:{Location:path,'Cache
 function parsePairs(value,names){return String(value??'').split('\n').filter(l=>l.trim()).map(line=>{const i=line.indexOf('|');return i<0?null:{[names[0]]:line.slice(0,i).trim(),[names[1]]:line.slice(i+1).trim()};}).filter(p=>p&&p[names[0]]&&p[names[1]]);}
 function parseForm(data){const keys=['id','title','category','excerpt','answer','takeaways','body','cover','imageAlt','author','reviewer','reviewedAt','seoTitle','description','status'];const p=Object.fromEntries(keys.map(k=>[k,String(data.get(k)??'').trim()]));p.bodyFormat=data.get('bodyFormat')==='html'?'html':'markdown';p.reviewApproved=data.get('reviewApproved')==='yes';p.tags=String(data.get('tags')??'').split(',').map(t=>t.trim()).filter(Boolean).slice(0,15);p.sources=parsePairs(data.get('sourcesText'),['title','url']);p.faq=parsePairs(data.get('faqText'),['question','answer']);p.seoTitle||=p.title;p.description||=p.excerpt;return p;}
 
-export const isManagerRequest=path=>/^\/admin(?:\/|$)/.test(path)||path.startsWith('/api/posts')||/^\/media\/[\w-]+\/(?:cover|inline\/[\w-]+)$/.test(path);
+export const isManagerRequest=path=>/^\/admin(?:\/|$)/.test(path)||path.startsWith('/api/posts')||/^\/api\/statistics(?:\/|$)/.test(path)||path==='/api/public/track'||/^\/media\/[\w-]+\/(?:cover|inline\/[\w-]+)$/.test(path);
 function defaultPreview(p,_posts,config){return '<article class="prose"><p>'+esc(config.categories.find(c=>c.slug===p.category)?.name)+'</p><h1>'+esc(p.title)+'</h1><p>'+esc(p.excerpt)+'</p><p>'+esc(p.author)+'</p>'+postBody(p)+(p.status==='published'?'<p><a href="'+config.publicPostBase+encodeURIComponent(p.id)+'/" target="_blank" rel="noopener">발행된 글 보기</a></p>':'')+'</article>';}
 // Internal router: the host must supply verified authentication context. Use createPageManager for standalone installs.
 export function createManagerRoutes(input={},options={}){

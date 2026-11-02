@@ -7,6 +7,8 @@ import {siteOrigin,articleSchema} from './seo.js';
 import {articleHtml} from './html-content.js';
 import {createManagerRoutes} from '../packages/page-manager/src/routes.js';
 import {pageManagerConfig} from './page-manager-config.js';
+import {analyticsRoutes} from '../packages/page-manager/src/analytics.js';
+import {analyticsStore} from '../packages/page-manager/src/analytics-store.js';
 
 const xml=s=>esc(s);
 export function createApp(assets={}) {
@@ -15,9 +17,18 @@ export function createApp(assets={}) {
     try {
       const url=new URL(request.url),path=url.pathname;
       if(assets[path]){const a=assets[path];return new Response(Uint8Array.from(atob(a.data),c=>c.charCodeAt(0)),{headers:{'Content-Type':a.type,'Cache-Control':'public, max-age=3600','X-Content-Type-Options':'nosniff'}});}
-      const isAdmin=path.startsWith('/admin')||path.startsWith('/api/');
+      const publicTrack=path==='/api/public/track';
+      const isAdmin=path.startsWith('/admin')||(path.startsWith('/api/')&&!publicTrack);
       const authorized=env.LOCAL_PREVIEW===true||env.ADMIN_AUTHENTICATED===true||(!env.VERCEL_RUNTIME&&Boolean(request.headers.get('oai-authenticated-user-id')));
       if(isAdmin&&!authorized){return new Response('사이트 소유자 로그인이 필요합니다.',{status:403,headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'}});}
+      if(publicTrack||/^\/(?:admin\/(?:statistics|sites)(?:\/|$)|api\/statistics(?:\/|$))/.test(path)){
+        if(!env.DB)return new Response('통계 저장소 연결이 필요합니다.',{status:503,headers:{'Cache-Control':'no-store'}});
+        if(pageManagerConfig.analytics.enabled&&(env.SITE_URL||env.LOCAL_PREVIEW===true)){
+          const canonical=new URL(siteOrigin(env.SITE_URL,url.origin)),store=analyticsStore(env.DB);
+          if(!await store.site(pageManagerConfig.id))await store.saveSite({id:pageManagerConfig.id,name:pageManagerConfig.siteName,domains:[canonical.host],active:true});
+        }
+        return await analyticsRoutes(request,{...env,ADMIN_AUTHENTICATED:authorized},pageManagerConfig,(title,body)=>admin.adminLayout({title,body,path,csrf:env.CSRF_TOKEN??'',username:env.ADMIN_USERNAME||'관리자',local:env.LOCAL_PREVIEW===true}));
+      }
       const managed=await manager.fetch(request,{...env,ADMIN_AUTHENTICATED:isAdmin?authorized:env.ADMIN_AUTHENTICATED});
       if(managed)return managed;
       if(!env.DB) return new Response('게시판 데이터베이스를 연결하지 못했습니다. 관리자에게 문의해주세요.',{status:503,headers:{'Content-Type':'text/plain; charset=utf-8'}});
@@ -43,7 +54,7 @@ export function createApp(assets={}) {
       const post=path.match(/^\/health\/([\w-]+)\/$/);if(post){const p=published.find(p=>p.id===post[1]);if(!p)return notFound();const schema=[articleSchema(p,origin,path)];const faq=p.faq?.length?p.faq:p.bodyFormat==='html'?articleHtml(p.body).faq:[];if(faq.length)schema.push(faqSchema(faq));return frame(p.seoTitle||p.title,p.description||p.excerpt,v.article(p,posts),{schema,post:p,pageType:p.category==='notice'?'WebPage':'MedicalWebPage',noindex:isTestPost(p),breadcrumbs:[{name:'홈',url:'/'},{name:'건강정보',url:'/health/'},{name:categoryName(p.category),url:'/health/category/'+p.category+'/'},{name:p.title,url:path}]});}
       if(path==='/clinic/')return frame('병원안내','부산 양정베스트안과의 의료진 소개와 진료 공간, 진료시간 및 방문 안내',v.clinicPage());
       if(path==='/location/')return frame('오시는 길과 진료안내',h.address+' · 4층 접수·외래·검진, 5층 수술센터 · '+h.phone,v.locationPage(),{schema:[faqSchema(v.clinicFAQ.map(([question,answer])=>({question,answer})))]});
-      if(path==='/privacy/')return frame('개인정보 안내','홈페이지 개인정보 및 게시판 운영 안내',`<section class="wrap policy">${v.pageIntro('PRIVACY','개인정보 안내')}<div class="prose"><h2>방문자 정보 입력</h2><p>이 홈페이지는 방문자 회원가입, 환자 상담 접수, 온라인 예약 및 결제 정보를 수집하지 않습니다. 진료 문의는 병원 전화로 안내합니다.</p><h2>게시판 정보</h2><p>관리자가 작성한 글, 작성자·검수자 이름 및 대표이미지는 운영 데이터베이스에 저장됩니다. 글에 환자 이름, 연락처, 진료기록 등 개인정보를 입력하지 마세요.</p><h2>접속 및 인증</h2><p>게시판 관리는 관리자 인증 후 이용합니다. 관리자 로그인 유지를 위해 최대 8시간의 필수 세션 쿠키를 사용하며, 로그인 성공·실패 이벤트는 서버 운영 로그에 기록합니다. 이 이벤트에는 아이디·비밀번호·원문 IP를 기록하지 않습니다. 비밀 키와 비밀번호는 방문자에게 공개하지 않습니다. 별도의 광고·방문자 분석 추적 스크립트는 설치하지 않았습니다.</p><h2>외부 지도</h2><p>오시는 길의 지도는 Google Maps에서 제공합니다. 지도 이용에는 <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google 개인정보처리방침</a>이 적용됩니다.</p><h2>문의</h2><p>개인정보 관련 문의: ${h.phone}. 실제 공개 운영 전 병원 담당자가 처리방침과 운영 주체를 최종 확인해야 합니다.</p></div></section>`,{noindex:true});
+      if(path==='/privacy/')return frame('개인정보 안내','홈페이지 개인정보 및 게시판 운영 안내',`<section class="wrap policy">${v.pageIntro('PRIVACY','개인정보 안내')}<div class="prose"><h2>방문자 정보 입력</h2><p>이 홈페이지는 방문자 회원가입, 환자 상담 접수, 온라인 예약 및 결제 정보를 수집하지 않습니다. 진료 문의는 병원 전화로 안내합니다.</p><h2>게시판 정보</h2><p>관리자가 작성한 글, 작성자·검수자 이름 및 대표이미지는 운영 데이터베이스에 저장됩니다. 글에 환자 이름, 연락처, 진료기록 등 개인정보를 입력하지 마세요.</p><h2>접속 및 인증</h2><p>게시판 관리는 관리자 인증 후 이용합니다. 관리자 로그인 유지를 위해 최대 8시간의 필수 세션 쿠키를 사용하며, 로그인 성공·실패 이벤트는 서버 운영 로그에 기록합니다. 이 이벤트에는 아이디·비밀번호·원문 IP를 기록하지 않습니다. 비밀 키와 비밀번호는 방문자에게 공개하지 않습니다. 광고 추적 스크립트는 사용하지 않습니다.</p><h2>홈페이지 방문통계</h2><p>홈페이지 이용 흐름을 확인하기 위해 방문한 페이지 경로·제목, 방문 시각, 유입경로, UTM 캠페인 값, 기기·운영체제·브라우저 정보, 페이지 체류시간, 스크롤과 전화·예약 등 버튼 클릭 이벤트, 접속 IP를 수집합니다. 검색어·URL 해시와 폼 입력값은 수집하지 않습니다. 브라우저 로컬 저장소에 방문자 식별자를, 세션 저장소에 세션 식별자를 보관하며, Do Not Track이 1로 설정된 브라우저와 관리자·API 페이지는 수집에서 제외합니다. 방문기록은 Supabase 통계 전용 저장소에 보관하고 인증된 관리자만 조회합니다. 자동 삭제 기간은 현재 설정되어 있지 않습니다.</p><h2>외부 지도</h2><p>오시는 길의 지도는 Google Maps에서 제공합니다. 지도 이용에는 <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google 개인정보처리방침</a>이 적용됩니다.</p><h2>문의</h2><p>개인정보 관련 문의: ${h.phone}. 실제 공개 운영 전 병원 담당자가 처리방침과 운영 주체를 최종 확인해야 합니다.</p></div></section>`,{noindex:true});
       if(path==='/editorial-policy/')return frame('콘텐츠 운영원칙','건강정보의 출처, 검수, 발행과 수정 원칙',`<section class="wrap policy">${v.pageIntro('EDITORIAL POLICY','정확하게 쓰고, 확인 후 전합니다.')}<div class="prose"><h2>질문에 먼저 답합니다</h2><p>의료정보는 핵심 답변과 요약, 본문 순서로 읽을 수 있게 구성합니다. 단정적인 표현이나 과장된 치료효과를 사용하지 않습니다.</p><h2>검수 후 발행합니다</h2><p>의료정보 글에는 실제 작성자와 의료 검수자, 검수일을 입력하고 검수 완료를 확인해야 합니다. 임시저장과 검수 대기 글은 방문자 목록 및 검색용 사이트맵에 포함하지 않습니다.</p><h2>출처와 수정일을 남깁니다</h2><p>자료를 인용할 때는 실제 참고한 자료의 제목과 주소를 본문에 표시합니다. 글을 고칠 때 수정일을 갱신하고, 변경된 의료정보는 다시 검수합니다. 관련 콘텐츠와 최신 콘텐츠는 주제에 따라 구분합니다.</p><h2>병원 정보의 출처</h2><p>병원명, 진료분야, 전화·주소·진료시간은 <a href="${h.source}" target="_blank" rel="noopener">병원 공식 홈페이지</a>를 기준으로 ${h.verifiedAt} 확인했습니다. 주차 등 확인되지 않은 사항은 전화로 안내합니다.</p></div></section>`);
       if(path==='/robots.txt')return new Response(`User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /api/\nSitemap: ${origin}/sitemap.xml\n`,{headers:{'Content-Type':'text/plain; charset=utf-8'}});
       if(path==='/sitemap.xml'){const paths=['/',...(indexable.length?['/health/']:[]),'/clinic/','/location/','/editorial-policy/',...categories.filter(c=>indexable.some(p=>p.category===c.slug)).map(c=>'/health/category/'+c.slug+'/'),...(indexable.some(p=>p.category==='notice')?['/health/category/notice/']:[])];return new Response(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${paths.map(p=>`<url><loc>${xml(origin+p)}</loc></url>`).join('')}${indexable.map(p=>`<url><loc>${xml(origin+'/health/'+p.id+'/')}</loc><lastmod>${xml(p.updatedAt)}</lastmod></url>`).join('')}</urlset>`,{headers:{'Content-Type':'application/xml; charset=utf-8'}});}

@@ -48,7 +48,7 @@
 
 새 Supabase 테이블이나 추가 환경변수 없이 기존 `posts`와 서버 관리자 계정으로 동작합니다. `scripts/build-vercel.mjs`와 이전 Worker 자산 목록 모두 관리자 CSS·JS를 포함합니다.
 
-관리자 HTML은 no-store, noindex,nofollow, 프레임 삽입 금지를 적용합니다. 공개 사이트의 robots·사이트맵에는 관리자 내부 화면을 포함하지 않습니다. 상담·팝업·멀티사이트 통계처럼 이번 홈페이지에 연결하지 않은 기능은 메뉴와 공개 API를 만들지 않았습니다.
+관리자 HTML은 no-store, noindex,nofollow, 프레임 삽입 금지를 적용합니다. 공개 사이트의 robots·사이트맵에는 관리자 내부 화면을 포함하지 않습니다. 상담·팝업처럼 이번 홈페이지에 연결하지 않은 기능은 메뉴와 공개 API를 만들지 않았습니다. clinic.6부터 방문통계와 통계 사이트 관리를 연결했으며 조회·설정은 기존 관리자 로그인으로 보호합니다. `/api/public/track`만 수집용 공개 경로이고 허용 도메인·요청 형식 검사를 거칩니다.
 
 검증: `npm test`, `npm run build:vercel`, `npm run build`, `npm run check`. 로컬 개발 서버는 루프백 주소에만 바인딩되며 관리자 인증을 생략하는 미리보기 모드입니다. 인터넷에 개발 서버를 노출하지 않습니다. 모바일 관리 화면은 `/__preview/mobile?screen=admin`에서 확인할 수 있습니다.
 
