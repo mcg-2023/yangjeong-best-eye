@@ -63,6 +63,11 @@ test('clinic.5 transfers large originals in small requests through the Vercel/Su
   const reopened=createVercelHandler({environment:()=>env,fetchImpl});
   const page=await reopened(new Request(origin+'/health/'+id+'/'));assert.equal(page.status,200);
   const html=await page.text();assert.ok(html.includes(cover));assert.match(html,/ql-align-right/);assert.match(html,/width:57%/);
+  assert.ok(html.includes('<figure><img src="'+cover+'"'),'the article renders a reference-backed cover outside metadata');
+  for(const path of ['/','/health/','/health/category/notice/']){
+    const listing=await (await reopened(new Request(origin+path))).text();
+    assert.ok(listing.includes('<img class="post-cover" src="'+cover+'"'),path+' renders the reference-backed thumbnail');
+  }
   const streamed=await reopened(new Request(origin+src));assert.equal(streamed.headers.get('content-type'),'image/png');
   assert.deepEqual(Buffer.from(await streamed.arrayBuffer()),original);
   assert.deepEqual(Buffer.from(await (await reopened(new Request(origin+cover))).arrayBuffer()),png);
